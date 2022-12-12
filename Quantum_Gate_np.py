@@ -1,6 +1,6 @@
 from functools import reduce
 import itertools
-from numpy import array, kron, pi, exp, sqrt, sin, cos, eye
+from numpy import array, kron, pi, exp, sqrt, sin, cos, eye, zeros
 from typing import List, Dict, Tuple
 
 I = 1j
@@ -80,8 +80,73 @@ class DensityMatrix:
         pass
 
 
-
 class QuantumGate:
+
+    def __init__(self, n: int, 
+                free_bits_dict: Dict[int, array], target_bits_dict: Dict[int, array], controlled_bits_dict: Dict[int, int],
+                auto_compute_matrix: bool = True) -> None:
+
+        """
+        channel label starts from 0
+        n: total number of channels
+        free_bits_dict: {channel label: gate operator}
+        target_bits_dict: {channel label: gate operator}
+        controlled_bits_dict: {channel label: activate_on 0 or 1}
+        """
+        
+        self.n = n
+        self.basis_kets = eye(2**self.n)
+
+        self.free_bits_dict = free_bits_dict
+        self.target_bits_dict = target_bits_dict
+        self.controlled_bits_dict = controlled_bits_dict
+        
+        self.acitivation_gate_dict = self.free_bits_dict|self.target_bits_dict
+        for i in range(self.n):
+            if i not in self.acitivation_gate_dict:
+                self.acitivation_gate_dict[i] = Id2
+            
+            if i not in self.free_bits_dict:
+                self.free_bits_dict[i] = Id2
+        
+        self.activated_operator_list = dict(sorted(self.acitivation_gate_dict.items())).values()
+        self.non_activated_operator_list = dict(sorted(self.free_bits_dict.items())).values()
+        
+        self.matrix_rep = self.compute_matrix_rep() if auto_compute_matrix else None
+    
+
+    def compute_matrix_rep(self):
+
+        activated_gate = self.activated_operator_list
+        non_activated_gate = self.non_activated_operator_list
+
+        f_is_activated = lambda bin_num, control_dict: reduce( 
+                                                                lambda b1, b2: b1 & b2, 
+                                                                map(lambda c: bin_num[c[0]] == str(c[1]), control_dict.items())
+                                                             )
+
+        if len(self.controlled_bits_dict) == 0:
+            return reduce(kron, non_activated_gate)
+
+        else:
+            
+            projector = 0
+            for i in range(2**self.n):
+                num = bin(i)[2:]
+                num = '0' * (self.n - len(num)) + num
+                
+                if len(self.controlled_bits_dict) != 0 and f_is_activated(num, self.controlled_bits_dict):
+                    basis = self.basis_kets[i].reshape(2**self.n, 1)
+                    projector += (basis @ basis.T)
+
+            matrix_rep = reduce(kron, activated_gate) @ projector + reduce(kron, non_activated_gate) @ (eye(2**self.n) - projector)
+
+            return matrix_rep
+
+
+
+
+class QuantumGate_old:
 
     def __init__(self, n: int, free_bits_dict: Dict[int, array], target_bits_dict: Dict[int, array], controlled_bits_dict: Dict[int, int]) -> None:
 
@@ -113,6 +178,12 @@ class QuantumGate:
         self.controlled_bits_val = self.controlled_bits_dict.values()
 
         self.matrix_rep = self.compute_matrix_rep()
+    
+
+    def construct_control_projection(self):
+        pass
+
+        
         
 
     def compute_matrix_rep(self) -> array:
