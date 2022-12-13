@@ -1,5 +1,20 @@
 from functools import reduce
 from itertools import product
+from PauliString import PauliString, SinglePauliString, toPauliBasis
+
+
+def jwEncodingMap(n: int):
+    
+    jw_dict = {}
+
+    for i in range(n):
+        cXi = tuple('Z' * i + 'X' + 'I' * (n - i - 1))
+        cYi = tuple('Z' * i + 'Y' + 'I' * (n - i - 1))
+        
+        jw_dict[(i, 1)] = SinglePauliString(operator_tup= (cXi,), coefficient=0.5) - SinglePauliString(operator_tup= (cYi,), coefficient=0.5j)
+        jw_dict[(i, 0)] = SinglePauliString(operator_tup= (cXi,), coefficient=0.5) + SinglePauliString(operator_tup= (cYi,), coefficient=0.5j)
+    
+    return jw_dict
 
 
 class FermionicOperator:
@@ -16,6 +31,8 @@ class FermionicOperator:
         self.fermionic_operator = reduce(self.dict_adder, single_fos)
         
         self.rep = set([SingleFermionicOperator( operator_tup=op_tup, coefficient=op_c) for op_tup, op_c in self.fermionic_operator.items()])
+        if len(self.rep) == 0:
+            self.rep = 0
 
     
     def get_dict(self):
@@ -117,7 +134,8 @@ class FermionicOperator:
 
 class SingleFermionicOperator:
 
-    def __init__(self, operator_tup: tuple, coefficient: complex) -> None:
+
+    def __init__(self, operator_tup: tuple, coefficient: complex, jw_map: dict = None) -> None:
         
         """
         operator_tup = (position = int, dagger = 0, 1)
@@ -126,7 +144,20 @@ class SingleFermionicOperator:
         self.coefficient = coefficient
 
         self.rep = {self.operator_tup: self.coefficient}
+        
+        self.jw_map = jw_map
     
+
+    def jw_encoding(self):
+        assert self.jw_map is not None, 'This method is not suitable for this operator'
+
+        jw_op = [self.jw_map[op] for op in self.operator_tup]
+        jw_op = reduce(lambda x, y: x @ y, jw_op)
+        jw_op = jw_op.simplify() * self.coefficient
+        
+        return jw_op
+
+
     def __hash__(self) -> int:
         return hash(tuple(self.rep))
 
@@ -210,3 +241,20 @@ if __name__ == '__main__':
     print(sfo4 @ fo1)
     print(fo2 @ fo1)
     print(fo2.get_dict())
+
+    
+
+    print('----------- Jordan Wigner ------------------')
+    
+    n = 5
+    jw = jwEncodingMap(n)
+    for i, d in product(range(n), range(2)):
+        print((i, d))
+        print(jw[(i, d)])
+
+    op1 = jw[(1, 1)] @ jw[(1, 0)]
+    op2 = jw[(1, 0)] @ jw[(1, 1)]
+    
+    print(((op1 + op2).simplify()))
+    sfo1 = SingleFermionicOperator(operator_tup = ((0, 0), (3, 1)), coefficient = -3.5j, jw_map=jw)
+    print(sfo1.jw_encoding())
