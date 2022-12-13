@@ -1,5 +1,19 @@
 from functools import reduce
 from itertools import product
+from numpy import array, eye
+from math import prod
+
+
+
+def toPauliBasis(matrix: array):
+        assert matrix.shape == (2, 2), 'this only works for 2d matrix'
+        
+        a = matrix[0, 0]
+        b = matrix[0, 1]
+        c = matrix[1, 0]
+        d = matrix[1, 1]
+
+        return 0.5 * (a + d), 0.5 * (b + c), 0.5j * (b - c), 0.5 * (a - d)
 
 
 class PauliString:
@@ -17,6 +31,10 @@ class PauliString:
         
         self.rep = set([SinglePauliString( operator_tup=op_tup, coefficient=op_c) for op_tup, op_c in self.fermionic_operator.items()])
 
+
+    def simplify(self):
+        simped_op_list = [op.simplify() for op in self.rep]
+        return PauliString(*simped_op_list)
 
     def __len__(self):
         return len(self.rep)
@@ -81,11 +99,11 @@ class PauliString:
         assert isinstance(other, SinglePauliString) or isinstance(other, PauliString), 'Not SingleFermionicOperator or FermionicOperator'
         if isinstance(other, SinglePauliString):
             new_rep = map(lambda x: x @ other, self.rep)
-            return new_rep
         
         elif isinstance(other, PauliString):
             new_rep = [op1 @ op2 for op1, op2 in product(self.rep, other.rep)]
-            return PauliString(*new_rep)
+        
+        return PauliString(*new_rep)
     
     def __rmatmul__(self, other):
         assert isinstance(other, SinglePauliString) or isinstance(other, PauliString), 'Not SingleFermionicOperator or FermionicOperator'
@@ -103,7 +121,6 @@ class PauliString:
         for s in self.rep:
             str_rep += str(s)
             str_rep += '\n'
-
         return str_rep
     
     def __str__(self) -> str:
@@ -112,16 +129,46 @@ class PauliString:
 
 class SinglePauliString:
 
+    Id2 = eye(2)
+    X = array([[0., 1.], [1., 0.]])
+    Y = array([[0., -1j], [1j, 0.]])
+    Z = array([[1., 0.], [0., -1.]])
+
+    pauli_dict_map = {'I': Id2, 'X': X, 'Y': Y, 'Z': Z}
+
+
     def __init__(self, operator_tup: tuple, coefficient: complex) -> None:
         
         """
-        operator_tup = (position = int, dagger = 0, 1)
+        operator_tup = (('X', 'Y'), ('I', 'Z'))
         """
         self.operator_tup = operator_tup
         self.coefficient = coefficient
 
         self.rep = {self.operator_tup: self.coefficient}
     
+
+    def simplify(self):
+
+        op_kron_form = []
+
+        for op in zip(*self.operator_tup):
+            op = map(lambda x: self.pauli_dict_map[x], op)
+            op = reduce(lambda x, y: x @ y, op)
+            op = toPauliBasis(op)
+            
+            op_kron_form.append(op)
+
+        final_operator = []
+        pauli_matrices = [('I', 'X', 'Y', 'Z')] * len(op_kron_form)
+        
+        for c_tup, op in zip(product(*op_kron_form), product(*pauli_matrices)):
+            c = prod(c_tup) * self.coefficient
+            if c != 0:
+                final_operator.append(SinglePauliString(operator_tup=op, coefficient=c))
+        
+        return sum(final_operator)
+
     def __hash__(self) -> int:
         return hash(tuple(self.rep))
 
@@ -192,16 +239,24 @@ class SinglePauliString:
 
 if __name__ == '__main__':
 
-    sfo1 = SinglePauliString(operator_tup = ('X',), coefficient = -3.5j)
-    sfo2 = SinglePauliString(operator_tup = ('X',), coefficient = 0.5j)
-    sfo3 = SinglePauliString(operator_tup = ('Y', 'Z'), coefficient = 2)
-    sfo4 = SinglePauliString(operator_tup = ('X',), coefficient = 2)
+    sp1 = SinglePauliString(operator_tup = (('X', 'I', 'X', 'Z'), ('Y', 'Z', 'X', 'Z')), coefficient = -3.5j)
+    sp2 = SinglePauliString(operator_tup = (('X', 'Y', 'I', 'X'),), coefficient = 0.5j)
+    sp3 = SinglePauliString(operator_tup = (('Z', 'Y', 'I', 'Y'),), coefficient = 0.5j)
+    
 
-    fo1 = PauliString(sfo1, sfo2, sfo3)
-    fo2 = PauliString(sfo1, sfo3, sfo4)
+    sp4 = (sp1 + sp2) @ (sp3 + sp2)
+
+    print(sp1)
+    print(sp1.simplify())
+    print(sp2)
+    print(sp2.simplify())
+    print(sp3)
+    print(sp3.simplify())
+
+    print('sp4:')
+    print(sp4)
+    print(sp4.simplify().rep)
+
     
     
-    print('fo1', fo1)
-    print('fo2', fo2)
-    print(sfo4 @ fo1)
-    print(fo2 @ fo1)
+    
