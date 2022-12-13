@@ -1,19 +1,19 @@
 from functools import reduce
 from itertools import product
-from numpy import array, eye
+from numpy import array, eye, kron
 from math import prod
 
 
 
 def toPauliBasis(matrix: array):
-        assert matrix.shape == (2, 2), 'this only works for 2d matrix'
-        
-        a = matrix[0, 0]
-        b = matrix[0, 1]
-        c = matrix[1, 0]
-        d = matrix[1, 1]
+    assert matrix.shape == (2, 2), 'this only works for 2d matrix'
+    
+    a = matrix[0, 0]
+    b = matrix[0, 1]
+    c = matrix[1, 0]
+    d = matrix[1, 1]
 
-        return 0.5 * (a + d), 0.5 * (b + c), 0.5j * (b - c), 0.5 * (a - d)
+    return 0.5 * (a + d), 0.5 * (b + c), 0.5j * (b - c), 0.5 * (a - d)
 
 
 class PauliString:
@@ -31,6 +31,10 @@ class PauliString:
         
         self.rep = set([SinglePauliString( operator_tup=op_tup, coefficient=op_c) for op_tup, op_c in self.fermionic_operator.items()])
 
+
+    def matrix_rep(self):
+        simped_op_list = [op.matrix_rep() for op in self.rep]
+        return sum(simped_op_list)
 
     def simplify(self):
         simped_op_list = [op.simplify() for op in self.rep]
@@ -148,6 +152,20 @@ class SinglePauliString:
         self.rep = {self.operator_tup: self.coefficient}
     
 
+    def matrix_rep(self):
+        
+        if type(self.operator_tup[0]) is tuple:
+            ps = self.simplify()
+        
+        else:
+            ps = self
+        
+        ps = ps.operator_tup
+        ps = map(lambda x: self.pauli_dict_map[x], ps)
+        ps = reduce(lambda x, y: kron(x, y), ps)
+        
+        return ps * self.coefficient
+
     def simplify(self):
 
         op_kron_form = []
@@ -244,18 +262,27 @@ if __name__ == '__main__':
     sp3 = SinglePauliString(operator_tup = (('Z', 'Y', 'I', 'Y'),), coefficient = 0.5j)
     
 
-    sp4 = (sp1 + sp2) @ (sp3 + sp2)
+    sp4 = sp2 @ (sp1 + sp2) @ (sp3 + sp2)
 
+    print('sp1:')
     print(sp1)
     print(sp1.simplify())
+    # print(sp1.matrix_rep())
+    
+    print('sp2:')
     print(sp2)
     print(sp2.simplify())
+    
+    print('sp3:')
     print(sp3)
     print(sp3.simplify())
 
-    print('sp4:')
+    print('------------------------------- sp4:')
+    print(sp1 + sp2)
+    print(sp3 + sp2)
     print(sp4)
-    print(sp4.simplify().rep)
+    print(sp4.simplify())
+    print(sp4.matrix_rep())
 
     
     
