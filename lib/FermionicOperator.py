@@ -86,11 +86,11 @@ class FermionicOperator:
         assert isinstance(other, SingleFermionicOperator) or isinstance(other, FermionicOperator), 'Not SingleFermionicOperator or FermionicOperator'
         if isinstance(other, SingleFermionicOperator):
             new_rep = map(lambda x: x @ other, self.rep)
-            return new_rep
         
         elif isinstance(other, FermionicOperator):
             new_rep = [op1 @ op2 for op1, op2 in product(self.rep, other.rep)]
-            return FermionicOperator(*new_rep)
+        
+        return FermionicOperator(*new_rep)
     
     def __rmatmul__(self, other):
         assert isinstance(other, SingleFermionicOperator) or isinstance(other, FermionicOperator), 'Not SingleFermionicOperator or FermionicOperator'
