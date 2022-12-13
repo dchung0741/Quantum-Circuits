@@ -1,0 +1,5 @@
+__pycache__/*.pyc
+*.hdf5
+learning/*.ipynb
+lib/QuantumGate_v1.py
+

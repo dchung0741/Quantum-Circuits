@@ -187,7 +187,7 @@ class HartreeFock:
 
     Z_dict = {'H': 1, 'He': 2}
 
-    def __init__(self, molecule_geometry, zeta_dict: dict, SCF_iteration: int = 10, show_iter_info: bool = False) -> None:
+    def __init__(self, molecule_geometry, zeta_dict: dict, zeta_sto3g_param = None,  SCF_iteration: int = 10, show_iter_info: bool = False) -> None:
 
         """
         zeta_dict: {atom_name: zeta value}
@@ -198,7 +198,12 @@ class HartreeFock:
         self.molecule_geometry = molecule_geometry
         
         self.zeta_dict = zeta_dict
-        self.zeta_sto3g_param_dict = {name: self.get_sto3g_parameter(zeta=Zc) for name, Zc in self.zeta_dict.items()}
+
+        if zeta_sto3g_param is None:
+            self.zeta_sto3g_param_dict = {name: self.get_sto3g_parameter(zeta=zeta) for name, zeta in self.zeta_dict.items()}
+        else:
+            self.zeta_sto3g_param_dict = zeta_sto3g_param
+
         self.atom_wavefunc_dict = {
                 i: {
                     1: GaussianBasisFunction(x = x, y = y, z = z, d = self.zeta_sto3g_param_dict[name]['d1'], alpha = self.zeta_sto3g_param_dict[name]['a1']),
@@ -219,6 +224,8 @@ class HartreeFock:
         
         self.psi_AB_h = copy(self.psi_RB_h)
         self.psi_AB_4_tensor = self.get_psi_AB_4()
+
+        self.VN = self.get_VN()
 
         if SCF_iteration > 0:
             self.SCF_loop(n_iter=SCF_iteration, show_iter_info=show_iter_info)
@@ -252,6 +259,19 @@ class HartreeFock:
 
         return optimized_param_dict
     
+    def get_VN(self):
+        res = 0 
+        for [atom1, r1], [atom2, r2] in product(self.molecule_geometry, self.molecule_geometry):
+            
+            if r1 == r2:
+                continue
+            else:
+                Z1 = self.Z_dict[atom1]
+                Z2 = self.Z_dict[atom2]
+                r = norm(array(r1) - array(r2))
+                res += Z1 * Z2/r
+        
+        return res/2
     
     def compute_STV(self) -> array:
         
@@ -385,8 +405,14 @@ if __name__ == '__main__':
 
     from numpy.random import random, rand
     
+    zeta_sto3g_param = {
+                        'H': {'d1': 0.4445552091948825, 'd2': 0.5352232023083906, 'd3': 0.15432669889572,
+                              'a1': 0.16885477998091206, 'a2': 0.6238951181789986, 'a3': 3.4249357542890673},
+                        'He': {'d1': 0.1560428816721606, 'd2': 0.44277856834372026, 'd3': 0.535212374440112, 
+                               'a1': 9.638138077379443, 'a2': 0.47981409046842505, 'a3': 1.7667449635820272}
+                        }
     # hf = HartreeFock(molecule_geometry = [['H', [0, 0, 0]], ['H', [0, 0, 1.4]]], zeta_dict={'H': 1.24})
-    hf = HartreeFock(molecule_geometry = [['H', [0, 0, 0]], ['He', [0, 0, 1.4632/2]]], zeta_dict={'H': 1.24, 'He': 2.0925}, SCF_iteration=0, show_iter_info=True)
+    hf = HartreeFock(molecule_geometry = [['H', [0, 0, 0]], ['He', [0, 0, 1.4632]]], zeta_dict={'H': 1.24, 'He': 2.0925}, zeta_sto3g_param = zeta_sto3g_param, SCF_iteration=0, show_iter_info=True)
     # print(hf.atom_wavefunc_dict)
     # phi1 = hf.atom_wavefunc_dict[0][1]
     # phi2 = hf.atom_wavefunc_dict[0][1]
@@ -436,4 +462,8 @@ if __name__ == '__main__':
     print('Final eps')
     print('--------------------------------------------------')
     print(hf.eps)
-    
+    print('--------------------------------------------------')
+    print('Final E0')
+    print('--------------------------------------------------')
+    print(hf.VN)
+    print(hf.E0 + hf.VN)
