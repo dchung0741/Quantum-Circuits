@@ -1,6 +1,6 @@
 from functools import reduce
 from itertools import product
-from PauliString import PauliString, SinglePauliString, toPauliBasis
+from .PauliString import PauliString, SinglePauliString, toPauliBasis
 
 
 def jwEncodingMap(n: int):
