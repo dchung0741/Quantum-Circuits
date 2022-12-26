@@ -1,6 +1,9 @@
+from Operator_and_State import SingleOperator, Operator, SingleKet, Ket
+from PauliString import SinglePauliString, PauliString
 from functools import reduce
 from itertools import product
-from .PauliString import PauliString, SinglePauliString, toPauliBasis
+from numpy import array, eye, kron
+from math import prod
 
 
 def jwEncodingMap(n: int):
@@ -14,215 +17,76 @@ def jwEncodingMap(n: int):
         jw_dict[(i, 1)] = SinglePauliString(operator_tup= (cXi,), coefficient=0.5) - SinglePauliString(operator_tup= (cYi,), coefficient=0.5j)
         jw_dict[(i, 0)] = SinglePauliString(operator_tup= (cXi,), coefficient=0.5) + SinglePauliString(operator_tup= (cYi,), coefficient=0.5j)
     
+    jw_dict = jw_dict|{'I': SinglePauliString(operator_tup = (tuple('I'*n),), coefficient=1, is_identity=True)}
     return jw_dict
 
 
-class FermionicOperator:
+class SingleFermionicOperator(SingleOperator):
 
-    def __init__(self, *SingleFOs) -> None:
+    def __init__(self, operator_tup: tuple, coefficient: complex = 1, jw_map: dict = None, is_identity = False) -> None:
         
-        """
-        self.single_fermionic_operators: of SingleFermionicOperator
-        """
-        self.single_fermionic_operators = SingleFOs
-        self.dict_adder = lambda d1, d2: {k: v for k in set(d1)|set(d2) if (v := d1.get(k, 0) + d2.get(k, 0)) != 0}
-        
-        single_fos = map(lambda fo: fo.rep, SingleFOs)
-        self.fermionic_operator = reduce(self.dict_adder, single_fos)
-        
-        self.rep = set([SingleFermionicOperator( operator_tup=op_tup, coefficient=op_c) for op_tup, op_c in self.fermionic_operator.items()])
-        if len(self.rep) == 0:
-            self.rep = 0
+        super().__init__(operator_tup, coefficient, is_identity=is_identity,
+                         add_to_type = FermionicOperator, 
+                         act_on_type = (FermionicOperator, SingleFermionicOperator, SingleFermionicState, FermionicState), 
+                         act_by_type = (FermionicOperator, SingleFermionicOperator))
 
-    
-    def get_dict(self):
-        dict_form = { list(c.rep.keys())[0]: list(c.rep.values())[0] for c in self.rep}
-        return dict_form
-
-
-    def __len__(self):
-        return len(self.rep)
-
-    def __add__(self, other):
-        assert isinstance(other, FermionicOperator) or isinstance(other, SingleFermionicOperator) or other == 0, '123'
-        
-        if isinstance(other, FermionicOperator):
-            fo1 = tuple(self.rep)
-            fo2 = tuple(other.rep)
-            new_op = FermionicOperator(*(fo1 + fo2))
-
-        elif isinstance(other, SingleFermionicOperator):
-            fo1 = tuple(self.rep)
-            fo2 = (other,)
-            new_op = FermionicOperator(*(fo1 + fo2))
-
-        elif other == 0:
-            new_op = self
-        
-        else:
-            pass
-        
-        """---------------------------------------------------------"""
-        if len(new_op.rep) == 0:
-            return 0
-        
-        elif len(new_op.rep) == 1:
-            return list(new_op.rep)[0]
-        
-        else:
-            return new_op
-
-
-    def __radd__(self, other):
-        return self + other
-
-    def __neg__(self):
-        new_rep = map(lambda x: -x, self.rep)
-        return FermionicOperator(*new_rep)
-
-    def __sub__(self, other):
-        return self + (-other)
-    
-    def __rsub__(self, other):
-        return  - self + other
-    
-    def __mul__(self, other):
-        assert isinstance(other, complex) or isinstance(other, float) or isinstance(other, int), 'Not numeric value'
-        new_rep = map(lambda x: other * x, self.rep)
-        return FermionicOperator(*new_rep)
-
-    def __rmul__(self, other):
-        assert isinstance(other, complex) or isinstance(other, float) or isinstance(other, int), 'Not numeric value'
-        return self * other
-    
-    def __truediv__(self, other):
-        assert isinstance(other, complex) or isinstance(other, float) or isinstance(other, int), 'Not numeric value'
-        return 1/other * self
-    
-    def __matmul__(self, other):
-        assert isinstance(other, SingleFermionicOperator) or isinstance(other, FermionicOperator), 'Not SingleFermionicOperator or FermionicOperator'
-        if isinstance(other, SingleFermionicOperator):
-            new_rep = map(lambda x: x @ other, self.rep)
-        
-        elif isinstance(other, FermionicOperator):
-            new_rep = [op1 @ op2 for op1, op2 in product(self.rep, other.rep)]
-        
-        return FermionicOperator(*new_rep)
-    
-    def __rmatmul__(self, other):
-        assert isinstance(other, SingleFermionicOperator) or isinstance(other, FermionicOperator), 'Not SingleFermionicOperator or FermionicOperator'
-        
-        if isinstance(other, SingleFermionicOperator):
-            new_rep = map(lambda x: other@x, self.rep)
-            return FermionicOperator(*new_rep)
-        
-        else:
-            return other @ self
-    
-
-    def __repr__(self) -> str:
-        str_rep = ''
-        for s in self.rep:
-            str_rep += str(s)
-            str_rep += '\n'
-
-        return str_rep
-    
-    def __str__(self) -> str:
-        return self.__repr__()
-
-
-class SingleFermionicOperator:
-
-
-    def __init__(self, operator_tup: tuple, coefficient: complex, jw_map: dict = None) -> None:
-        
-        """
-        operator_tup = (position = int, dagger = 0, 1)
-        """
-        self.operator_tup = operator_tup
-        self.coefficient = coefficient
-
-        self.rep = {self.operator_tup: self.coefficient}
-        
         self.jw_map = jw_map
-    
 
-    def jw_encoding(self):
-        assert self.jw_map is not None, 'This method is not suitable for this operator'
 
-        jw_op = [self.jw_map[op] for op in self.operator_tup]
+    def jw_encoding(self, with_map = None):
+        # assert self.jw_map is not None, 'This method is not suitable for this operator'
+
+        jw_map = self.jw_map if with_map is None else with_map
+
+        jw_op = [jw_map[op] for op in self.operator_tup]
         jw_op = reduce(lambda x, y: x @ y, jw_op)
         jw_op = jw_op.simplify() * self.coefficient
         
         return jw_op
 
 
-    def __hash__(self) -> int:
-        return hash(tuple(self.rep))
+    def simplify(self):
+        pass
 
-    def __eq__(self, other) -> bool:
-        assert isinstance(other, SingleFermionicOperator), 'SingleFermionicOperator can only be compared to SingleFermionicOperator'
-        return hash(self) == hash(other)
-    
-    def __add__(self, other):
-        
-        if isinstance(other, SingleFermionicOperator):
-            if other.operator_tup == self.operator_tup:
-                c = self.coefficient + other.coefficient
-                return SingleFermionicOperator(operator_tup=self.operator_tup, coefficient = c)        
-            else:
-                return FermionicOperator(self, other)
-        
-        if isinstance(other, FermionicOperator):
-            return other + self
-        
-        if other == 0:
-            return self
 
-    def __radd__(self, other):
-        return self + other
-    
-    def __neg__(self):
-        c = - self.coefficient
-        return SingleFermionicOperator(operator_tup=self.operator_tup, coefficient=c)
-    
-    def __sub__(self, other):
-        return self + (-other)
-    
-    def __rsub__(self, other):
-        return other + (-self)
+class FermionicOperator(Operator):
 
-    def __mul__(self, other):
-        assert isinstance(other, complex) or isinstance(other, float) or isinstance(other, int), 'Not numeric value'
-        c = self.coefficient * other
-        return SingleFermionicOperator(operator_tup=self.operator_tup, coefficient=c)
-    
-    def __rmul__(self, other):
-        return self * other
-    
-    def __truediv__(self, other):
-        assert isinstance(other, complex) or isinstance(other, float) or isinstance(other, int), 'Not numeric value'
-        return 1/other * self
-    
-    def __matmul__(self, other):
-        assert isinstance(other, SingleFermionicOperator) or isinstance(other, FermionicOperator), 'Not SingleFermionicOperator or FermionicOperator'
-        if isinstance(other, SingleFermionicOperator):
-            new_op = self.operator_tup + other.operator_tup
-            new_c = self.coefficient * other.coefficient
-            return SingleFermionicOperator(operator_tup=new_op, coefficient=new_c)
-
-        if isinstance(other, FermionicOperator):
-            return other.__rmatmul__(self)
-    
-    def __rmatmul__(self, other):
-        return other @ self
+    def __init__(self, *SingleFOs, jw_map = None) -> None:
+        super().__init__(*SingleFOs, 
+                         single_type = SingleFermionicOperator, 
+                         act_on_type = (FermionicOperator, SingleFermionicOperator, SingleFermionicState, FermionicState), 
+                         act_by_type = (FermionicOperator, SingleFermionicOperator))
         
-    def __repr__(self) -> str:
-        return str(self.rep)[1:-1]
+        self.jw_map = jw_map
+
     
-    def __str__(self) -> str:
-        return self.__repr__()
+    def jw_encoding(self, with_map = None):
+        jw_map = self.jw_map if with_map is None else with_map
+        res = [ sfo.jw_encoding(with_map = jw_map) for sfo in self.rep]
+        return sum(res)
+        
+        
+            
+class SingleFermionicState(SingleKet):
+
+    def __init__(self, label_tup: tuple, coefficient: complex, operator=None) -> None:
+        if operator is None:
+            operator = SingleFermionicOperator(('I',), is_identity=True)
+        super().__init__(label_tup, coefficient, operator = operator, 
+                         add_to_type = FermionicOperator, 
+                         act_by_type = (FermionicOperator, SingleFermionicOperator))
+
+
+    def evaluate(self):
+        pass
+
+class FermionicState(Ket):
+
+    def __init__(self, *SingleFermionicStates) -> None:
+        super().__init__(*SingleFermionicStates, 
+                         single_type=SingleFermionicState, 
+                         act_by_type = (FermionicOperator, SingleFermionicOperator))
+
 
 
 if __name__ == '__main__':
@@ -234,16 +98,25 @@ if __name__ == '__main__':
 
     fo1 = FermionicOperator(sfo1, sfo2, sfo3)
     fo2 = FermionicOperator(sfo1, sfo3, sfo4)
-    
+    fo3 = sfo4 @ fo1 @ sfo2 + sfo1 @ sfo1 - 3 * fo1 @ fo2
+
+    print(type(sfo4 @ fo1 @ sfo2))
+    print(type(sfo1 @ sfo1))
+    print(type(- 3 * fo1))
+    print(type(- (3 * fo1) @ fo2))
+    print(type(sfo1 @ sfo1 - 3 * fo1 @ fo2))
     
     print('fo1', fo1)
     print('fo2', fo2)
-    print(sfo4 @ fo1)
+    print(fo3)
     print(fo2 @ fo1)
     print(fo2.get_dict())
+    
+    print(hash(fo3))
+
+    print(type(fo3))
 
     
-
     print('----------- Jordan Wigner ------------------')
     
     n = 5
@@ -256,5 +129,29 @@ if __name__ == '__main__':
     op2 = jw[(1, 0)] @ jw[(1, 1)]
     
     print(((op1 + op2).simplify()))
-    sfo1 = SingleFermionicOperator(operator_tup = ((0, 0), (3, 1)), coefficient = -3.5j, jw_map=jw)
-    print(sfo1.jw_encoding())
+    # sfo1 = SingleFermionicOperator(operator_tup = ((0, 0), (3, 1)), coefficient = -3.5j, jw_map=jw)
+    
+    
+    print('sfo1', sfo1.jw_encoding(with_map=jw))
+    print('sfo2', sfo2.jw_encoding(with_map=jw))
+    print('sfo3', sfo3.jw_encoding(with_map=jw))
+    
+    print(fo1.jw_encoding(with_map = jw))
+
+    print('------------Identity test---------------')
+    
+    sfo_id = SingleFermionicOperator(('I',), coefficient=3, is_identity=True)
+    print(sfo1)
+    print(sfo_id @ sfo1)
+    
+    print(sfo_id.jw_encoding(with_map=jw))
+
+    print('fo1', fo1)
+    print('id @ fo1', (sfo_id @ fo1))
+    print('fo1 @ id', (fo1 @ sfo_id))
+
+    xxx = [i for i in fo1.rep]
+    print(xxx)
+
+    sfs1 = SingleFermionicState((1, 0, 0, 0), 1j)
+    print(type(sfs1.operator))

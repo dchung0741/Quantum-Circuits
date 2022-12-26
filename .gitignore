@@ -6,3 +6,5 @@ lib/__pycache__/*.pyc
 Quantum_Gates_Example_v1.ipynb
 lib/QuantumState.py
 lib/Operator.py
+lib/FermionicOperator_v1.py
+lib/PauliString_v1.py
