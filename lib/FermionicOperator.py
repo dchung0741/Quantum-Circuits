@@ -1,5 +1,5 @@
-from Operator_and_State import SingleOperator, Operator, SingleKet, Ket
-from PauliString import SinglePauliString, PauliString
+from .Operator_and_State import SingleOperator, Operator, SingleKet, Ket
+from .PauliString import SinglePauliString, PauliString
 from functools import reduce
 from itertools import product
 from numpy import array, eye, kron

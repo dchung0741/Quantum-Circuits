@@ -249,12 +249,15 @@ class Operator:
     
 
     def __repr__(self) -> str:
-        str_rep = ''
-        for s in self.rep:
-            str_rep += str(s)
-            str_rep += '\n'
+        if self.rep != 0:
+            str_rep = ''
+            for s in self.rep:
+                str_rep += str(s)
+                str_rep += '\n'
 
-        return str_rep
+            return str_rep
+        else:
+            return '0'
     
     def __str__(self) -> str:
         return self.__repr__()
@@ -360,7 +363,7 @@ class SingleKet:
         if isinstance(new_operator, Operator):
             f_ket = lambda op: type(self)(label_tup= self.label_tup, coefficient=self.coefficient, operator=op)
             ket = map(f_ket, new_operator.rep)
-            return Ket(*ket)
+            return self.add_to_type(*ket)
         
     def __repr__(self) -> str:
         ((op, label), coeff) = list(self.rep.items())[0]
