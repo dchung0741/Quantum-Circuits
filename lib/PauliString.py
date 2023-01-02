@@ -1,4 +1,4 @@
-from Operator_and_State import SingleOperator, Operator, SingleKet, Ket
+from .Operator_and_State import SingleOperator, Operator, SingleKet, Ket
 
 from functools import reduce
 from itertools import product
@@ -56,7 +56,7 @@ class SinglePauliString(SingleOperator):
         for op in zip(*self.operator_tup):
             op = map(lambda x: op_dict[x], op)
             op = reduce(lambda x, y: x @ y, op)
-            op = toPauliBasis(op)
+            op = toPauliBasis(op.round(10))
             
             op_kron_form.append(op)
 
@@ -93,7 +93,7 @@ class SingleQuantumState(SingleKet):
 
     state_map = {0: array([[1], [0]]), 1: array([[0], [1]])}
 
-    def __init__(self, label_tup: tuple, coefficient: complex, operator: SinglePauliString = None) -> None:
+    def __init__(self, label_tup: tuple, coefficient: complex = 1, operator: SinglePauliString = None) -> None:
         if operator is None:
             n_bit = len(label_tup)
             operator = SinglePauliString((('I',) * n_bit,), is_identity=True)

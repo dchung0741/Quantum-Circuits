@@ -1,12 +1,13 @@
-from PauliString import PauliString, SinglePauliString, toPauliBasis
+from .PauliString import PauliString, SinglePauliString, toPauliBasis, SingleQuantumState
 from typing import Dict
 from numpy import array
-
+from functools import reduce
+from itertools import product
 
 def generateQuantumGate(n: int, 
-                        free_bits_dict: Dict[int, str], 
-                        target_bits_dict: Dict[int, str], 
-                        controlled_bits_dict: Dict[int, int], 
+                        free_bits_dict: Dict[int, str] = {}, 
+                        target_bits_dict: Dict[int, str] = {}, 
+                        controlled_bits_dict: Dict[int, int] = {}, 
                         additional_operator_dict = None):
     
     identity = SinglePauliString((('I',)*n,), is_identity=1)
@@ -38,14 +39,23 @@ def generateQuantumGate(n: int,
 
 
 
-class QuatumGate:
+def constructQuantumCircuit(*args):
+    return reduce(lambda g1, g2: (g1 @ g2).simplify(), reversed(args))
 
-    def __init__(self,  n: int, free_bits_dict: Dict[int, array], target_bits_dict: Dict[int, array], controlled_bits_dict: Dict[int, int]) -> None:
-        self.n = n
 
 
 if __name__ == '__main__':
+    
+    def print_title(f):
 
+        def wrapper():
+            func_name = f.__name__
+            title_string = f'-------------------- {func_name} --------------------'
+            print(title_string)
+            f()
+            print('-' * len(title_string))
+        
+        return wrapper
     
     # CNOT = generateQuantumGate(n = 2, free_bits_dict={}, target_bits_dict={1: 'X'}, controlled_bits_dict={0: 1})
 
@@ -62,54 +72,98 @@ if __name__ == '__main__':
     T = array([[1, 0], [0, exp(1j * pi/4)]])
     S = array([[1, 0], [0, 1j]])
 
-    Toffoli_c0c1_t2 = generateQuantumGate(n = 3, free_bits_dict={}, target_bits_dict={2: 'X'}, controlled_bits_dict={0: 1, 1: 1})
-    Toffoli_c0c2_t1 = generateQuantumGate(n = 3, free_bits_dict={}, target_bits_dict={1: 'X'}, controlled_bits_dict={0: 1, 2: 1})
-    Toffoli_c1c2_t0 = generateQuantumGate(n = 3, free_bits_dict={}, target_bits_dict={0: 'X'}, controlled_bits_dict={1: 1, 2: 1})
+    @print_title
+    def Fredkin_from_Toffoli():
+        Toffoli_c0c1_t2 = generateQuantumGate(n = 3, free_bits_dict={}, target_bits_dict={2: 'X'}, controlled_bits_dict={0: 1, 1: 1})
+        Toffoli_c0c2_t1 = generateQuantumGate(n = 3, free_bits_dict={}, target_bits_dict={1: 'X'}, controlled_bits_dict={0: 1, 2: 1})
+        Toffoli_c1c2_t0 = generateQuantumGate(n = 3, free_bits_dict={}, target_bits_dict={0: 'X'}, controlled_bits_dict={1: 1, 2: 1})
 
-    print(Toffoli_c0c1_t2)
-    print(Toffoli_c0c1_t2.matrix_rep())
+        print(Toffoli_c0c1_t2)
+        print(Toffoli_c0c1_t2.matrix_rep())
 
-    print(Toffoli_c0c1_t2.simplify())
-    print(Toffoli_c0c2_t1.simplify())
-    print(Toffoli_c0c1_t2.matrix_rep() @ Toffoli_c0c2_t1.matrix_rep() @ Toffoli_c0c1_t2.matrix_rep())
+        print(Toffoli_c0c1_t2.simplify())
+        print(Toffoli_c0c2_t1.simplify())
+        print(Toffoli_c0c1_t2.matrix_rep() @ Toffoli_c0c2_t1.matrix_rep() @ Toffoli_c0c1_t2.matrix_rep())
 
-    Fredkin = Toffoli_c0c1_t2 @ Toffoli_c0c2_t1 @ Toffoli_c0c1_t2
-    print(Fredkin)
-    print(Fredkin.simplify())
-    print(Fredkin.simplify().matrix_rep())
+        Fredkin = Toffoli_c0c1_t2 @ Toffoli_c0c2_t1 @ Toffoli_c0c1_t2
+        print(Fredkin)
+        print(Fredkin.simplify())
+        print(Fredkin.simplify().matrix_rep())
     
-    sps1 = SinglePauliString(operator_tup=(('I', 'Z', 'I'), ('I', 'I', 'I'), ('Z', 'I', 'X')), coefficient=-0.046875)
-    sps2 = SinglePauliString(operator_tup=(('I', 'I', 'X'), ('Z', 'X', 'Z'), ('Z', 'Z', 'I')), coefficient= -0.015625)
-    ps = sps1 + sps2
-    print(ps)
     
-    print(ps.simplify().matrix_rep())
-    print(ps.matrix_rep() == ps.simplify().matrix_rep())
-    
-    G1 = generateQuantumGate(n = 3, free_bits_dict={0: 'H'}, target_bits_dict={}, controlled_bits_dict={}, additional_operator_dict={'H': H, 'S': S, 'T': T})
-    G2 = generateQuantumGate(n = 3, free_bits_dict={}, target_bits_dict={0: 'S'}, controlled_bits_dict={1: 1}, additional_operator_dict={'H': H, 'S': S, 'T': T})
-    G3 = generateQuantumGate(n = 3, free_bits_dict={}, target_bits_dict={0: 'T'}, controlled_bits_dict={2: 1}, additional_operator_dict={'H': H, 'S': S, 'T': T})
-    G4 = generateQuantumGate(n = 3, free_bits_dict={1: 'H'}, target_bits_dict={}, controlled_bits_dict={}, additional_operator_dict={'H': H, 'S': S, 'T': T})
-    G5 = generateQuantumGate(n = 3, free_bits_dict={}, target_bits_dict={1: 'S'}, controlled_bits_dict={2: 1}, additional_operator_dict={'H': H, 'S': S, 'T': T})
-    G6 = generateQuantumGate(n = 3, free_bits_dict={2: 'H'}, target_bits_dict={}, controlled_bits_dict={}, additional_operator_dict={'H': H, 'S': S, 'T': T})
-    
-    swap = SinglePauliString(operator_tup=(('I', 'I', 'I'),), coefficient=0.5) 
-    print(swap.simplify())
 
-    swap = swap + SinglePauliString(operator_tup=(('X', 'I', 'X'),), coefficient=0.5) 
-    swap = swap + SinglePauliString(operator_tup=(('Y', 'I', 'Y'),), coefficient=0.5) 
-    swap = swap + SinglePauliString(operator_tup=(('Z', 'I', 'Z'),), coefficient=0.5) 
+    @print_title
+    def QuantumFourierTransform():
+        G1 = generateQuantumGate(n = 3, free_bits_dict={0: 'H'}, target_bits_dict={}, controlled_bits_dict={}, additional_operator_dict={'H': H, 'S': S, 'T': T})
+        G2 = generateQuantumGate(n = 3, free_bits_dict={}, target_bits_dict={0: 'S'}, controlled_bits_dict={1: 1}, additional_operator_dict={'H': H, 'S': S, 'T': T})
+        G3 = generateQuantumGate(n = 3, free_bits_dict={}, target_bits_dict={0: 'T'}, controlled_bits_dict={2: 1}, additional_operator_dict={'H': H, 'S': S, 'T': T})
+        G4 = generateQuantumGate(n = 3, free_bits_dict={1: 'H'}, target_bits_dict={}, controlled_bits_dict={}, additional_operator_dict={'H': H, 'S': S, 'T': T})
+        G5 = generateQuantumGate(n = 3, free_bits_dict={}, target_bits_dict={1: 'S'}, controlled_bits_dict={2: 1}, additional_operator_dict={'H': H, 'S': S, 'T': T})
+        G6 = generateQuantumGate(n = 3, free_bits_dict={2: 'H'}, target_bits_dict={}, controlled_bits_dict={}, additional_operator_dict={'H': H, 'S': S, 'T': T})
+        
+        swap = SinglePauliString(operator_tup=(('I', 'I', 'I'),), coefficient=0.5) 
+        print(swap.simplify())
+
+        swap = swap + SinglePauliString(operator_tup=(('X', 'I', 'X'),), coefficient=0.5) 
+        swap = swap + SinglePauliString(operator_tup=(('Y', 'I', 'Y'),), coefficient=0.5) 
+        swap = swap + SinglePauliString(operator_tup=(('Z', 'I', 'Z'),), coefficient=0.5) 
+        
+        # print(G1)
+        # print(G2)
+        # print(G3)
+        # print(G4)
+        # print(G5)
+        # print(G6)
+        
+        FT = reduce(lambda x, y: x @ y, reversed([G1, G2, G3, G4, G5, G6]))
+        FT = sqrt(8) * swap @ FT.simplify()
+        print(FT)
+        print(FT.simplify())
+        print(FT.simplify().matrix_rep().round(3))
+        print(FT.matrix_rep().round(3))
+
+
+    @print_title
+    def generate_entangle():
+
+        g1 = generateQuantumGate(n = 2, free_bits_dict={0: 'H'}, target_bits_dict={}, controlled_bits_dict={}, additional_operator_dict={'H': H})
+        g2 = generateQuantumGate(n = 2, free_bits_dict={}, target_bits_dict={1: 'X'}, controlled_bits_dict={0: 1}, additional_operator_dict={'H': H})
+        circuit = reduce(lambda g1, g2: g1 @ g2, reversed([g1, g2]))
+        initial_state = SingleQuantumState(label_tup=(0, 0))
+        out_state = circuit @ initial_state
+        print(circuit)
+        print(out_state.evaluate())
+
     
-    # print(G1)
-    # print(G2)
-    # print(G3)
-    # print(G4)
-    # print(G5)
-    # print(G6)
+
+    @print_title
+    def CZ():
+
+        circuit = generateQuantumGate(n = 2, free_bits_dict={}, target_bits_dict={1: 'Z'}, controlled_bits_dict={0: 1}, additional_operator_dict={})  
+        initial_state_1 = SingleQuantumState(label_tup=(0, 0))
+        out_state_1 = circuit @ initial_state_1
+
+        initial_state_2 = SingleQuantumState(label_tup=(1, 1))
+        out_state_2 = circuit @ initial_state_2
+
+        initial_state_3 = SingleQuantumState(label_tup=(1, 0), coefficient=1/sqrt(2)) + SingleQuantumState(label_tup=(1, 1), coefficient=1/sqrt(2))
+        out_state_3 = circuit @ initial_state_3
+        print(circuit)
+        
+        print('out_state_1:\n', out_state_1.evaluate())
+        print('out_state_2:\n', out_state_2.evaluate())
+        print('out_state_3:\n', out_state_3.evaluate())
     
-    FT = reduce(lambda x, y: x @ y, reversed([G1, G2, G3, G4, G5, G6]))
-    FT = sqrt(8) * swap @ FT.simplify()
-    print(FT)
-    print(FT.simplify())
-    print(FT.simplify().matrix_rep().round(3))
-    print(FT.matrix_rep().round(3))
+
+    @print_title
+    def Clifford():
+        CNOT = generateQuantumGate(n = 2, free_bits_dict={}, target_bits_dict={1: 'X'}, controlled_bits_dict={0: 1})
+        XI = generateQuantumGate(n = 2, free_bits_dict={0: 'X', 1: 'I'}, target_bits_dict={}, controlled_bits_dict={})
+        print((CNOT @ XI @ CNOT).simplify())
+    # Fredkin_from_Toffoli()
+    QuantumFourierTransform()
+    # generate_entangle()
+    # CZ()
+    # Clifford()
+    # Deutsch()
+    # Bernstein_Vazirani()

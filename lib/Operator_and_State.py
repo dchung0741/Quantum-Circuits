@@ -265,7 +265,7 @@ class Operator:
 
 class SingleKet:
     
-    def __init__(self, label_tup: tuple , coefficient: complex, operator = None,
+    def __init__(self, label_tup: tuple , coefficient: complex = 1, operator = None,
                  add_to_type = None,
                  act_by_type = None,) -> None:
         
