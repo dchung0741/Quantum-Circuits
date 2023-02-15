@@ -3,6 +3,8 @@ from .Operator_and_State import SingleOperator, Operator, SingleKet, Ket
 from functools import reduce
 from itertools import product
 from numpy import array, eye, kron, diag
+from numpy.random import choice
+
 from math import prod
 
 
@@ -35,11 +37,6 @@ class SinglePauliString(SingleOperator):
 
     def matrix_rep(self):
         
-        # if type(self.operator_tup[0]) is tuple:
-        #     ps = self.simplify()
-        
-        # else:
-        #     ps = self
         ps = self.simplify()
         c = ps.coefficient
         ps = ps.operator_tup[0]
@@ -107,7 +104,7 @@ class SingleQuantumState(SingleKet):
         res = [SinglePauliString.pauli_dict_map[o] @ self.state_map[l] for o, l in zip(operator.operator_tup[0], self.label_tup)]
         overall_coeff = operator.coefficient * self.coefficient
         n = len(res)
-        res = [SingleKet(label_tup=comb, coefficient = c * overall_coeff) for comb in product(range(2), repeat=n) if (c := prod(array(res)[range(n), comb, 0])) !=0 ]
+        res = [SingleQuantumState(label_tup=comb, coefficient = c * overall_coeff) for comb in product(range(2), repeat=n) if (c := prod(array(res)[range(n), comb, 0])) !=0 ]
 
         if len(res) == 0:
             return 0
@@ -128,6 +125,21 @@ class QuantumState(Ket):
 
         res = [sket.evaluate() for sket in self.rep]
         return sum(res)
+
+    def sample(self, n):
+
+        c_list = array([s.coefficient for s in self.rep])
+        p_list = (c_list.conj() * c_list).real
+        # label_tup = array([s.label_tup for s in self.rep])
+        # n_qubit = len(label_tup[0])
+        label_dict = {i: s.label_tup for i, s in enumerate(self.rep)}
+
+        # out_sample = choice(range(2**n_qubit), size=n, p=p_list)
+        out_sample = choice(list(label_dict.keys()), size=n, p=p_list)
+        # print(out_sample)
+        # return map(lambda s: tuple(s), label_dict[out_sample])
+        return map(lambda s: label_dict[s], out_sample)
+
 
 if __name__ == '__main__':
 
