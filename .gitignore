@@ -1,6 +1,6 @@
 __pycache__/*.pyc
 *.hdf5
-learning/*.ipynb
+learning/
 lib/QuantumGate_v1.py
 lib/__pycache__/*.pyc
 Quantum_Gates_Example_v1.ipynb
@@ -8,3 +8,5 @@ lib/QuantumState.py
 lib/Operator.py
 lib/FermionicOperator_v1.py
 lib/PauliString_v1.py
+lib/Grouping/
+entanglement_measurement.ipynb
