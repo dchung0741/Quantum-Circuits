@@ -130,14 +130,10 @@ class QuantumState(Ket):
 
         c_list = array([s.coefficient for s in self.rep])
         p_list = (c_list.conj() * c_list).real
-        # label_tup = array([s.label_tup for s in self.rep])
-        # n_qubit = len(label_tup[0])
         label_dict = {i: s.label_tup for i, s in enumerate(self.rep)}
 
-        # out_sample = choice(range(2**n_qubit), size=n, p=p_list)
         out_sample = choice(list(label_dict.keys()), size=n, p=p_list)
-        # print(out_sample)
-        # return map(lambda s: tuple(s), label_dict[out_sample])
+        
         return map(lambda s: label_dict[s], out_sample)
 
 
