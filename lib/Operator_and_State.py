@@ -426,7 +426,7 @@ class Ket:
             pass
         
         """---------------------------------------------------------"""
-        if len(new_ket.rep) == 0:
+        if new_ket.rep == 0:
             return 0
         
         elif len(new_ket.rep) == 1:
