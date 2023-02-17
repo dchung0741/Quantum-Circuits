@@ -10,3 +10,4 @@ lib/FermionicOperator_v1.py
 lib/PauliString_v1.py
 lib/Grouping/
 entanglement_measurement.ipynb
+legacy/

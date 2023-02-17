@@ -4,11 +4,11 @@ from functools import reduce
 from itertools import product
 from numpy import array, eye, kron, diag
 from numpy.random import choice
-
+from numpy.typing import ArrayLike
 from math import prod
 
 
-def toPauliBasis(matrix: array):
+def toPauliBasis(matrix: ArrayLike):
     assert matrix.shape == (2, 2), 'this only works for 2d matrix'
     
     a = matrix[0, 0]
