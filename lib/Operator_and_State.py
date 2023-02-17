@@ -2,20 +2,27 @@ from functools import reduce
 from itertools import product
 from numpy import array, eye, kron
 from math import prod
-
-
+from typing_extensions import Self
+from typing import Union, Collection, Optional, cast
 
 class SingleOperator:
 
+    def __new__(cls: type[Self], operator_tup: tuple, coefficient: complex = 1, is_identity = False,
+                 add_to_type: Optional[type] = None,
+                 act_on_type: Optional[tuple[type]] = None,
+                 act_by_type: Optional[tuple[type]] = None) -> "SingleOperator":
+        
+        if coefficient == 0:
+            return cast(Self, 0.)
+        else:
+            return super(SingleOperator, cls).__new__(cls)
+
     def __init__(self, operator_tup: tuple, coefficient: complex = 1, is_identity = False,
-                 add_to_type = None,
-                 act_on_type = None,
-                 act_by_type = None,
+                 add_to_type: Optional[type] = None,
+                 act_on_type: Optional[tuple[type]] = None,
+                 act_by_type: Optional[tuple[type]] = None,
                  ) -> None:
         
-        """
-        operator_tup = (position = int, dagger = 0, 1)
-        """
         self.operator_tup = operator_tup
         self.coefficient = coefficient
         self.is_identity = is_identity
@@ -61,7 +68,7 @@ class SingleOperator:
     def __radd__(self, other):
         return self + other
     
-    def __neg__(self):
+    def __neg__(self) -> "SingleOperator":
         c = - self.coefficient
         return type(self)(operator_tup=self.operator_tup, coefficient=c)
     
@@ -71,15 +78,15 @@ class SingleOperator:
     def __rsub__(self, other):
         return other + (-self)
 
-    def __mul__(self, other):
+    def __mul__(self, other: Union[complex, float, int]) -> "SingleOperator":
         assert isinstance(other, complex) or isinstance(other, float) or isinstance(other, int), 'Not multiplied by a numeric value'
         c = self.coefficient * other
         return type(self)(operator_tup=self.operator_tup, coefficient=c, is_identity = self.is_identity)
     
-    def __rmul__(self, other):
+    def __rmul__(self, other: Union[complex, float, int]) -> "SingleOperator":
         return self * other
     
-    def __truediv__(self, other):
+    def __truediv__(self, other: Union[complex, float, int]) -> "SingleOperator":
         assert isinstance(other, complex) or isinstance(other, float) or isinstance(other, int), 'Not divided by numeric value'
         return 1/other * self
     
@@ -133,27 +140,39 @@ class SingleOperator:
 
 class Operator:
 
-    def __init__(self, *SingleFOs, 
-                 single_type = None,
-                 act_on_type = None,
-                 act_by_type = None,
+    def __new__(cls: type[Self], *single_operators: SingleOperator, 
+                 single_type: Optional[type] = None,
+                 act_on_type: Optional[tuple[type]] = None,
+                 act_by_type: Optional[tuple[type]] = None,) -> Self:
+        
+        dict_adder = lambda d1, d2: {k: v for k in set(d1)|set(d2) if (v := d1.get(k, 0) + d2.get(k, 0)) != 0}
+        single_ops = map(lambda op: op.rep, single_operators)
+        operator = reduce(dict_adder, single_ops)
+        single_type = SingleOperator if single_type is None else single_type
+        new_op_list = [single_type(operator_tup=op_tup, coefficient=op_c) for op_tup, op_c in operator.items()]
+
+        if len(new_op_list) == 0:
+            return cast(Operator, 0)
+        
+        elif len(new_op_list) == 1:
+            return new_op_list[0]
+        
+        else:
+            # Solution provided in 
+            # https://stackoverflow.com/questions/54358665/python-set-attributes-during-object-creation-in-new
+            new_op = super().__new__(cls)
+            object.__setattr__(new_op, 'rep', set(new_op_list))
+            return new_op
+
+    def __init__(self, *single_operators: SingleOperator, 
+                 single_type: Optional[type] = None,
+                 act_on_type: Optional[tuple[type]] = None,
+                 act_by_type: Optional[tuple[type]] = None,
                  ) -> None:
         
-        self.single_fermionic_operators = SingleFOs
-        self.dict_adder = lambda d1, d2: {k: v for k in set(d1)|set(d2) if (v := d1.get(k, 0) + d2.get(k, 0)) != 0}
-        
-        single_ops = map(lambda op: op.rep, SingleFOs)
-        self.operator = reduce(self.dict_adder, single_ops)
-
         self.single_type = SingleOperator if single_type is None else single_type
         self.act_on_type = (SingleOperator, Operator, Ket, SingleKet) if act_on_type is None else act_on_type
         self.act_by_type = (SingleOperator, Operator) if act_by_type is None else act_by_type
-
-        
-
-        self.rep = set([self.single_type(operator_tup=op_tup, coefficient=op_c) for op_tup, op_c in self.operator.items()])
-        if len(self.rep) == 0:
-            self.rep = 0
 
     def get_dict(self):
         dict_form = { list(c.rep.keys())[0]: list(c.rep.values())[0] for c in self.rep}
@@ -494,4 +513,7 @@ if __name__ == '__main__':
     sop2 = SingleOperator(operator_tup = ((0, 0),), coefficient = 27j)
     sket1 = SingleKet((1, 0, 0, 0), 1j)
     sket2 = SingleKet((1, 1, 0, 0), 8)
-    print((sop1 + sop2) @ (sket1 - 3j * sket2))
+    # print((sop1 + sop2) @ (sket1 - 3j * sket2))
+    # print(Operator(sop1, 4*sop2))
+    # print(SingleOperator(operator_tup = ((0, 1),), coefficient = 0))
+    print(Operator(sop1, sop2))
