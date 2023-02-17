@@ -7,6 +7,8 @@ from numpy.random import choice
 from numpy.typing import ArrayLike
 from math import prod
 
+from typing import Union, Optional
+from typing_extensions import Self
 
 def toPauliBasis(matrix: ArrayLike):
     assert matrix.shape == (2, 2), 'this only works for 2d matrix'
@@ -70,6 +72,12 @@ class SinglePauliString(SingleOperator):
 
 
 class PauliString(Operator):
+
+    def __new__(cls: type[Self], *single_operators: SingleOperator) -> Self:
+        return super().__new__(cls, *single_operators, 
+                               single_type = SinglePauliString, 
+                               act_on_type = (PauliString, SinglePauliString, SingleQuantumState, QuantumState), 
+                               act_by_type = (PauliString, SinglePauliString, SingleQuantumState, QuantumState))
 
     def __init__(self, *SingleFOs) -> None:
         super().__init__(*SingleFOs, 

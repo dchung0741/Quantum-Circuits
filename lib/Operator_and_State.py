@@ -170,9 +170,11 @@ class Operator:
                  act_by_type: Optional[tuple[type]] = None,
                  ) -> None:
         
+        
         self.single_type = SingleOperator if single_type is None else single_type
         self.act_on_type = (SingleOperator, Operator, Ket, SingleKet) if act_on_type is None else act_on_type
         self.act_by_type = (SingleOperator, Operator) if act_by_type is None else act_by_type
+        
 
     def get_dict(self):
         dict_form = { list(c.rep.keys())[0]: list(c.rep.values())[0] for c in self.rep}
@@ -517,3 +519,20 @@ if __name__ == '__main__':
     # print(Operator(sop1, 4*sop2))
     # print(SingleOperator(operator_tup = ((0, 1),), coefficient = 0))
     print(Operator(sop1, sop2))
+
+    class TestSinglePauliString(SingleOperator):
+        ...
+    class TestPauliString(Operator):
+
+        def __new__(cls: type[Self], *single_operators: SingleOperator) -> Self:
+            return super().__new__(cls, *single_operators, single_type=TestSinglePauliString, act_by_type= (int, float), act_on_type=(int, float))
+
+        def __init__(self, *single_operators: SingleOperator) -> None:
+            super().__init__(*single_operators, single_type=TestSinglePauliString, act_by_type= (int, float), act_on_type=(int, float))
+    
+
+    print(type(list(TestPauliString(TestSinglePauliString(('X',)), TestSinglePauliString(('Y',))).rep)[0]))
+
+    
+
+        
