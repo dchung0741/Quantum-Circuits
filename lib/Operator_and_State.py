@@ -2,12 +2,19 @@ from functools import reduce
 from itertools import product
 from numpy import array, eye, kron
 from math import prod
-from typing_extensions import Self
-from typing import Union, Collection, Optional, cast
+from typing_extensions import Self, TypeAlias
+from typing import Union, Collection, Optional, Iterable, Type, Callable, cast
+
+
+ReturnedOperator: TypeAlias = Union[Type["SingleOperator"], Type["Operator"]]
+ReturnedKet: TypeAlias = Union[Type["SingleKet"], Type["Ket"]]
+Numerics: TypeAlias = Union[complex, float, int]
+
 
 class SingleOperator:
 
-    def __new__(cls: type[Self], operator_tup: tuple, coefficient: complex = 1, is_identity = False,
+    def __new__(cls: type["SingleOperator"], 
+                 operator_tup: tuple, coefficient: Numerics = 1, is_identity = False,
                  add_to_type: Optional[type] = None,
                  act_on_type: Optional[tuple[type]] = None,
                  act_by_type: Optional[tuple[type]] = None) -> "SingleOperator":
@@ -17,7 +24,7 @@ class SingleOperator:
         else:
             return super(SingleOperator, cls).__new__(cls)
 
-    def __init__(self, operator_tup: tuple, coefficient: complex = 1, is_identity = False,
+    def __init__(self, operator_tup: tuple[Iterable], coefficient: complex = 1, is_identity = False,
                  add_to_type: Optional[type] = None,
                  act_on_type: Optional[tuple[type]] = None,
                  act_by_type: Optional[tuple[type]] = None,
@@ -140,22 +147,22 @@ class SingleOperator:
 
 class Operator:
 
-    def __new__(cls: type[Self], *single_operators: SingleOperator, 
+    def __new__(cls: type["Operator"], *single_operators: SingleOperator, 
                  single_type: Optional[type] = None,
                  act_on_type: Optional[tuple[type]] = None,
-                 act_by_type: Optional[tuple[type]] = None,) -> Self:
+                 act_by_type: Optional[tuple[type]] = None,) -> "Operator":
         
         dict_adder = lambda d1, d2: {k: v for k in set(d1)|set(d2) if (v := d1.get(k, 0) + d2.get(k, 0)) != 0}
         single_ops = map(lambda op: op.rep, single_operators)
         operator = reduce(dict_adder, single_ops)
         single_type = SingleOperator if single_type is None else single_type
-        new_op_list = [single_type(operator_tup=op_tup, coefficient=op_c) for op_tup, op_c in operator.items()]
+        new_op_list: list[Type[SingleOperator]] = [single_type(operator_tup=op_tup, coefficient=op_c) for op_tup, op_c in operator.items()]
 
         if len(new_op_list) == 0:
             return cast(Operator, 0)
         
         elif len(new_op_list) == 1:
-            return new_op_list[0]
+            return cast(Operator, new_op_list[0])
         
         else:
             # Solution provided in 
@@ -175,6 +182,7 @@ class Operator:
         self.act_on_type = (SingleOperator, Operator, Ket, SingleKet) if act_on_type is None else act_on_type
         self.act_by_type = (SingleOperator, Operator) if act_by_type is None else act_by_type
         
+        self.rep: set[Type[SingleOperator]]
 
     def get_dict(self):
         dict_form = { list(c.rep.keys())[0]: list(c.rep.values())[0] for c in self.rep}
@@ -187,38 +195,27 @@ class Operator:
     def __len__(self):
         return len(self.rep)
 
-    def __add__(self, other):
+    def __add__(self, other: Union[Type["Operator"], Type["SingleOperator"], int]):
         
         assert type(other) in (type(self), self.single_type) or other == 0, f'{type(self)} cannot be added to {type(other)}'
         
         if isinstance(other, Operator):
-            fo1 = tuple(self.rep)
-            fo2 = tuple(other.rep)
-            new_op = type(self)(*(fo1 + fo2))
+            op1 = tuple(self.rep)
+            op2 = tuple(other.rep)
+            new_op = type(self)(*(op1 + op2))
 
         elif isinstance(other, SingleOperator):
-            fo1 = tuple(self.rep)
-            fo2 = (other,)
-            new_op = type(self)(*(fo1 + fo2))
+            op1 = tuple(self.rep)
+            op2 = (other,)
+            new_op = type(self)(*(op1 + op2))
 
         elif other == 0:
             new_op = self
         
-        else:
-            pass
-        
-        """---------------------------------------------------------"""
-        if len(new_op.rep) == 0:
-            return 0
-        
-        elif len(new_op.rep) == 1:
-            return list(new_op.rep)[0]
-        
-        else:
-            return new_op
+        return new_op
 
 
-    def __radd__(self, other):
+    def __radd__(self, other: Union[Type["Operator"], Type["SingleOperator"]]):
         return self + other
 
     def __neg__(self):
@@ -285,10 +282,21 @@ class Operator:
 
 
 class SingleKet:
+
+    def __new__(cls: type["SingleKet"], 
+                label_tup: tuple, coefficient: Optional[Union[complex, float, int]] = 1, operator: Optional[Operator] = None,
+                add_to_type: Optional[type] = None,
+                act_on_type: Optional[tuple[type]] = None,
+                act_by_type: Optional[tuple[type]] = None) -> "SingleKet":
+        
+        if coefficient == 0:
+            return cast(Self, 0.)
+        else:
+            return super(SingleKet, cls).__new__(cls)
     
     def __init__(self, label_tup: tuple , coefficient: complex = 1, operator = None,
-                 add_to_type = None,
-                 act_by_type = None,) -> None:
+                 add_to_type: Optional[type] = None,
+                 act_by_type: Optional[tuple[type]] = None,) -> None:
         
         if operator is None:
             operator = SingleOperator(('I',), is_identity=True)
@@ -520,6 +528,7 @@ if __name__ == '__main__':
     # print(SingleOperator(operator_tup = ((0, 1),), coefficient = 0))
     print(Operator(sop1, sop2))
 
+    
     class TestSinglePauliString(SingleOperator):
         ...
     class TestPauliString(Operator):
@@ -535,4 +544,4 @@ if __name__ == '__main__':
 
     
 
-        
+    
