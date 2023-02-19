@@ -12,6 +12,8 @@ Numerics: TypeAlias = Union[complex, float, int]
 
 
 class SingleOperator:
+    
+    __slots__ = ('operator_tup', 'coefficient', 'is_identity', 'rep', 'add_to_type', 'act_on_type', 'act_by_type')
 
     def __new__(cls: type["SingleOperator"], 
                  operator_tup: tuple, coefficient: Numerics = 1, is_identity = False,
@@ -146,6 +148,8 @@ class SingleOperator:
 
 
 class Operator:
+
+    __slots__ = ('rep', 'single_type', 'act_on_type', 'act_by_type')
 
     def __new__(cls: type["Operator"], *single_operators: SingleOperator, 
                  single_type: Optional[type] = None,
@@ -283,10 +287,11 @@ class Operator:
 
 class SingleKet:
 
+    __slots__ = ('label_tup', 'coefficient', 'operator', 'rep', 'add_to_type', 'act_on_type', 'act_by_type')
+
     def __new__(cls: type["SingleKet"], 
                 label_tup: tuple, coefficient: Optional[Union[complex, float, int]] = 1, operator: Optional[Operator] = None,
                 add_to_type: Optional[type] = None,
-                act_on_type: Optional[tuple[type]] = None,
                 act_by_type: Optional[tuple[type]] = None) -> "SingleKet":
         
         if coefficient == 0:
@@ -338,7 +343,7 @@ class SingleKet:
     # Basic Arithmetics
     def __add__(self, other):
         
-        assert type(other) in (type(self), self.add_to_type) or other == 0, f'{(type(self))} cannot be added to {type(other)}'
+        assert type(other) in (type(self), self.add_to_type) or other == 0, f'{type(self)} cannot be added to {other}'
         
         if isinstance(other, SingleKet):
             if other.label_tup == self.label_tup and self.operator == other.operator:
@@ -404,24 +409,41 @@ class SingleKet:
 
 
 class Ket:
+
+    def __new__(cls: type["Operator"], *single_kets: SingleKet, 
+                 single_type: Optional[type] = None,
+                 act_on_type: Optional[tuple[type]] = None,
+                 act_by_type: Optional[tuple[type]] = None,) -> "Operator":
+        
+        dict_adder = lambda d1, d2: {k: v for k in set(d1)|set(d2) if (v := d1.get(k, 0) + d2.get(k, 0)) != 0}
+        single_kets = map(lambda op: op.rep, single_kets)
+        ket = reduce(dict_adder, single_kets)
+        single_type = SingleKet if single_type is None else single_type
+        new_ket_list: list[Type[SingleKet]] = [single_type(label_tup=ket_tup, coefficient=ket_c, operator=ket_op) for (ket_op, ket_tup), ket_c in ket.items()]
+        
+        if len(new_ket_list) == 0:
+            return cast(Ket, 0)
+        
+        elif len(new_ket_list) == 1:
+            return cast(Ket, new_ket_list[0])
+        
+        else:
+            # Solution provided in 
+            # https://stackoverflow.com/questions/54358665/python-set-attributes-during-object-creation-in-new
+            new_ket = super().__new__(cls)
+            object.__setattr__(new_ket, 'rep', set(new_ket_list))
+            return new_ket
     
     def __init__(self, *SingleKets, 
                  single_type = None,
                  act_by_type = None,
                  ) -> None:
         
-        self.single_kets = SingleKets
-        self.dict_adder = lambda d1, d2: {k: v for k in set(d1)|set(d2) if (v := d1.get(k, 0) + d2.get(k, 0)) != 0}
-        
-        single_kets = map(lambda ket: ket.rep, SingleKets)
-        self.ket = reduce(self.dict_adder, single_kets)
 
         self.single_type = SingleKet if single_type is None else single_type
         self.act_by_type = (SingleOperator, Operator) if act_by_type is None else act_by_type
 
-        self.rep = set([self.single_type(label_tup=label_tup, coefficient=c, operator=op) for ((op, label_tup), c) in self.ket.items()])
-        if len(self.rep) == 0:
-            self.rep = 0
+        self.rep: set[SingleKets]
 
     def get_dict(self):
         dict_form = { list(c.rep.keys())[0]: list(c.rep.values())[0] for c in self.rep}
@@ -436,7 +458,7 @@ class Ket:
 
     def __add__(self, other):
         
-        assert type(other) in (type(self), self.single_type) or other == 0, f'{type(self)} cannot be added to {type(other)}'
+        assert type(other) in (type(self), self.single_type) or other == 0, f'{self} cannot be added to {other}'
         
         if isinstance(other, Ket):
             fo1 = tuple(self.rep)
@@ -451,18 +473,7 @@ class Ket:
         elif other == 0:
             new_ket = self
         
-        else:
-            pass
-        
-        """---------------------------------------------------------"""
-        if new_ket.rep == 0:
-            return 0
-        
-        elif len(new_ket.rep) == 1:
-            return list(new_ket.rep)[0]
-        
-        else:
-            return new_ket
+        return new_ket
 
 
     def __radd__(self, other):
@@ -519,29 +530,31 @@ class Ket:
 
 if __name__ == '__main__':
     
-    sop1 = SingleOperator(operator_tup = ((0, 1),), coefficient = -3.5j)
-    sop2 = SingleOperator(operator_tup = ((0, 0),), coefficient = 27j)
+    # sop1 = SingleOperator(operator_tup = ((0, 1),), coefficient = -3.5j)
+    # sop2 = SingleOperator(operator_tup = ((0, 0),), coefficient = 27j)
+    # sket1 = SingleKet((1, 0, 0, 0), 1j)
+    # sket2 = SingleKet((1, 1, 0, 0), 8)
+    # # print((sop1 + sop2) @ (sket1 - 3j * sket2))
+    # # print(Operator(sop1, 4*sop2))
+    # # print(SingleOperator(operator_tup = ((0, 1),), coefficient = 0))
+    # print(Operator(sop1, sop2))
+
+    
+    # class TestSinglePauliString(SingleOperator):
+    #     ...
+    # class TestPauliString(Operator):
+
+    #     def __new__(cls: type[Self], *single_operators: SingleOperator) -> Self:
+    #         return super().__new__(cls, *single_operators, single_type=TestSinglePauliString, act_by_type= (int, float), act_on_type=(int, float))
+
+    #     def __init__(self, *single_operators: SingleOperator) -> None:
+    #         super().__init__(*single_operators, single_type=TestSinglePauliString, act_by_type= (int, float), act_on_type=(int, float))
+    
+
+    # print(type(list(TestPauliString(TestSinglePauliString(('X',)), TestSinglePauliString(('Y',))).rep)[0]))
+    
     sket1 = SingleKet((1, 0, 0, 0), 1j)
     sket2 = SingleKet((1, 1, 0, 0), 8)
-    # print((sop1 + sop2) @ (sket1 - 3j * sket2))
-    # print(Operator(sop1, 4*sop2))
-    # print(SingleOperator(operator_tup = ((0, 1),), coefficient = 0))
-    print(Operator(sop1, sop2))
 
-    
-    class TestSinglePauliString(SingleOperator):
-        ...
-    class TestPauliString(Operator):
-
-        def __new__(cls: type[Self], *single_operators: SingleOperator) -> Self:
-            return super().__new__(cls, *single_operators, single_type=TestSinglePauliString, act_by_type= (int, float), act_on_type=(int, float))
-
-        def __init__(self, *single_operators: SingleOperator) -> None:
-            super().__init__(*single_operators, single_type=TestSinglePauliString, act_by_type= (int, float), act_on_type=(int, float))
-    
-
-    print(type(list(TestPauliString(TestSinglePauliString(('X',)), TestSinglePauliString(('Y',))).rep)[0]))
-
-    
-
-    
+    ket = Ket(sket1, sket2)
+    print(sket1 - sket1)

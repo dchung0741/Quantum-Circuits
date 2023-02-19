@@ -124,6 +124,11 @@ class SingleQuantumState(SingleKet):
 
 class QuantumState(Ket):
 
+    def __new__(cls: type[Self], *single_kets: SingleKet) -> Self:
+        return super().__new__(cls, *single_kets, 
+                               single_type = SingleQuantumState, 
+                               act_by_type = (PauliString, SinglePauliString,))
+
     def __init__(self, *SingleQSs) -> None:
         super().__init__(*SingleQSs, 
                          single_type = SingleQuantumState, 
