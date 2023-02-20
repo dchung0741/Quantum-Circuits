@@ -1,32 +1,32 @@
-from .Operator_and_State import SingleOperator, Operator, SingleKet, Ket
+from .Operator_and_State import SingleOperator, Operator, SingleKet, Ket, Numerics
 
 from functools import reduce
 from itertools import product
 from numpy import array, eye, kron, diag
 from numpy.random import choice
-from numpy.typing import ArrayLike
+from numpy.typing import NDArray
 from math import prod
 
 from typing import Union, Optional
 from typing_extensions import Self
 
-def toPauliBasis(matrix: ArrayLike):
+def toPauliBasis(matrix: NDArray):
     assert matrix.shape == (2, 2), 'this only works for 2d matrix'
     
-    a = matrix[0, 0]
-    b = matrix[0, 1]
-    c = matrix[1, 0]
-    d = matrix[1, 1]
+    a: Numerics = matrix[0, 0]
+    b: Numerics = matrix[0, 1]
+    c: Numerics = matrix[1, 0]
+    d: Numerics = matrix[1, 1]
 
     return 0.5 * (a + d), 0.5 * (b + c), 0.5j * (b - c), 0.5 * (a - d)
 
 
 class SinglePauliString(SingleOperator):
 
-    Id2 = eye(2)
-    X = array([[0., 1.], [1., 0.]])
-    Y = array([[0., -1j], [1j, 0.]])
-    Z = array([[1., 0.], [0., -1.]])
+    Id2: NDArray = eye(2)
+    X: NDArray = array([[0., 1.], [1., 0.]])
+    Y: NDArray = array([[0., -1j], [1j, 0.]])
+    Z: NDArray = array([[1., 0.], [0., -1.]])
 
     pauli_dict_map = {'I': Id2, 'X': X, 'Y': Y, 'Z': Z}
 
@@ -85,7 +85,7 @@ class PauliString(Operator):
                          act_on_type = (PauliString, SinglePauliString, SingleQuantumState, QuantumState), 
                          act_by_type = (PauliString, SinglePauliString, SingleQuantumState, QuantumState))
 
-    def matrix_rep(self):
+    def matrix_rep(self) -> NDArray:
         simped_op_list = [op.matrix_rep() for op in self.rep]
         return sum(simped_op_list)
 
