@@ -6,9 +6,9 @@ from typing_extensions import Self, TypeAlias
 from typing import Union, Collection, Optional, Iterable, Type, Callable, cast
 
 
-ReturnedOperator: TypeAlias = Union[Type["SingleOperator"], Type["Operator"]]
-ReturnedKet: TypeAlias = Union[Type["SingleKet"], Type["Ket"]]
 Numerics: TypeAlias = Union[complex, float, int]
+OperatorType: TypeAlias = Union["SingleOperator", "Operator"]
+KetType: TypeAlias = Union["SingleKet", "Ket"]
 
 
 class SingleOperator:
@@ -49,13 +49,12 @@ class SingleOperator:
     def __hash__(self) -> int:
         return hash(tuple(self.rep))
 
-    def __eq__(self, other) -> bool:
+    def __eq__(self, other: "SingleOperator") -> bool:
         assert isinstance(other, SingleOperator), 'SingleFermionicOperator can only be compared to SingleFermionicOperator'
         return hash(self) == hash(other)
     
-
     # Basic Arithmetics
-    def __add__(self, other):
+    def __add__(self, other: Union[OperatorType, Numerics]) -> Union[OperatorType, Numerics]:
 
         assert type(other) in (type(self), self.add_to_type) or other == 0, f'{(type(self))} cannot be added to {type(other)}'
         
@@ -73,33 +72,32 @@ class SingleOperator:
         if other == 0:
             return self
 
-
-    def __radd__(self, other):
+    def __radd__(self, other: Union[OperatorType, Numerics]) -> Union[OperatorType, Numerics]:
         return self + other
     
     def __neg__(self) -> "SingleOperator":
         c = - self.coefficient
         return type(self)(operator_tup=self.operator_tup, coefficient=c)
     
-    def __sub__(self, other):
+    def __sub__(self, other: Union[OperatorType, Numerics]) -> Union[OperatorType, Numerics]:
         return self + (-other)
     
-    def __rsub__(self, other):
+    def __rsub__(self, other: Union[OperatorType, Numerics]) -> Union[OperatorType, Numerics]:
         return other + (-self)
 
-    def __mul__(self, other: Union[complex, float, int]) -> "SingleOperator":
+    def __mul__(self, other: Numerics) -> "SingleOperator":
         assert isinstance(other, complex) or isinstance(other, float) or isinstance(other, int), 'Not multiplied by a numeric value'
         c = self.coefficient * other
         return type(self)(operator_tup=self.operator_tup, coefficient=c, is_identity = self.is_identity)
     
-    def __rmul__(self, other: Union[complex, float, int]) -> "SingleOperator":
+    def __rmul__(self, other: Numerics) -> "SingleOperator":
         return self * other
     
-    def __truediv__(self, other: Union[complex, float, int]) -> "SingleOperator":
+    def __truediv__(self, other: Numerics) -> "SingleOperator":
         assert isinstance(other, complex) or isinstance(other, float) or isinstance(other, int), 'Not divided by numeric value'
         return 1/other * self
     
-    def __matmul__(self, other):
+    def __matmul__(self, other: Union[OperatorType, KetType]) -> Union[OperatorType, KetType]:
         assert type(other) in (*self.act_by_type, *self.act_on_type), f'{type(other)} cannot act on {type(self)}'
         
         if isinstance(other, SingleOperator):
@@ -137,7 +135,7 @@ class SingleOperator:
         if isinstance(other, Ket):
             return other.__rmatmul__(self)
         
-    def __rmatmul__(self, other):
+    def __rmatmul__(self, other: OperatorType) -> OperatorType:
         return other @ self
         
     def __repr__(self) -> str:
@@ -290,7 +288,9 @@ class SingleKet:
     __slots__ = ('label_tup', 'coefficient', 'operator', 'rep', 'add_to_type', 'act_on_type', 'act_by_type')
 
     def __new__(cls: type["SingleKet"], 
-                label_tup: tuple, coefficient: Optional[Union[complex, float, int]] = 1, operator: Optional[Operator] = None,
+                label_tup: tuple[Union[int, str]], 
+                coefficient: Optional[Numerics] = 1, 
+                operator: Optional[Operator] = None,
                 add_to_type: Optional[type] = None,
                 act_by_type: Optional[tuple[type]] = None) -> "SingleKet":
         
@@ -407,13 +407,12 @@ class SingleKet:
         return self.__repr__()
 
 
-
 class Ket:
 
-    def __new__(cls: type["Operator"], *single_kets: SingleKet, 
+    def __new__(cls: type["Ket"], *single_kets: SingleKet, 
                  single_type: Optional[type] = None,
                  act_on_type: Optional[tuple[type]] = None,
-                 act_by_type: Optional[tuple[type]] = None,) -> "Operator":
+                 act_by_type: Optional[tuple[type]] = None,) -> "Ket":
         
         dict_adder = lambda d1, d2: {k: v for k in set(d1)|set(d2) if (v := d1.get(k, 0) + d2.get(k, 0)) != 0}
         single_kets = map(lambda op: op.rep, single_kets)
