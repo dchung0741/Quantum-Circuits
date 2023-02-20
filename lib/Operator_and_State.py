@@ -3,20 +3,19 @@ from itertools import product
 from numpy import array, eye, kron
 from math import prod
 from typing_extensions import Self, TypeAlias
-from typing import Union, Collection, Optional, Iterable, Type, Callable, cast
-
+from typing import Union, Collection, Optional, Iterable, Iterator, Type, Callable, Any, cast, overload
 
 Numerics: TypeAlias = Union[complex, float, int]
 OperatorType: TypeAlias = Union["SingleOperator", "Operator"]
 KetType: TypeAlias = Union["SingleKet", "Ket"]
-
+LabelTuple: TypeAlias = tuple[Union[str, int], ...]
 
 class SingleOperator:
     
     __slots__ = ('operator_tup', 'coefficient', 'is_identity', 'rep', 'add_to_type', 'act_on_type', 'act_by_type')
 
     def __new__(cls: type["SingleOperator"], 
-                 operator_tup: tuple, coefficient: Numerics = 1, is_identity = False,
+                 operator_tup: tuple[tuple[Any], ...], coefficient: Optional[Numerics] = 1, is_identity: Optional[bool] = False,
                  add_to_type: Optional[type] = None,
                  act_on_type: Optional[tuple[type]] = None,
                  act_by_type: Optional[tuple[type]] = None) -> "SingleOperator":
@@ -26,7 +25,7 @@ class SingleOperator:
         else:
             return super(SingleOperator, cls).__new__(cls)
 
-    def __init__(self, operator_tup: tuple[Iterable], coefficient: complex = 1, is_identity = False,
+    def __init__(self, operator_tup: tuple[tuple[Any], ...], coefficient: Numerics = 1, is_identity: bool = False,
                  add_to_type: Optional[type] = None,
                  act_on_type: Optional[tuple[type]] = None,
                  act_by_type: Optional[tuple[type]] = None,
@@ -45,16 +44,22 @@ class SingleOperator:
         self.act_on_type = (SingleOperator, Operator, Ket, SingleKet) if act_on_type is None else act_on_type
         self.act_by_type = (SingleOperator, Operator) if act_by_type is None else act_by_type
 
-
     def __hash__(self) -> int:
         return hash(tuple(self.rep))
 
-    def __eq__(self, other: "SingleOperator") -> bool:
+    def __eq__(self, other: "SingleOperator") -> bool: # type: ignore
         assert isinstance(other, SingleOperator), 'SingleFermionicOperator can only be compared to SingleFermionicOperator'
         return hash(self) == hash(other)
     
     # Basic Arithmetics
-    def __add__(self, other: Union[OperatorType, Numerics]) -> Union[OperatorType, Numerics]:
+    
+    # Addition  
+    @overload
+    def __add__(self, other: Numerics) -> "Self": ...
+    @overload
+    def __add__(self, other: OperatorType) -> Union[OperatorType, Numerics]: ...
+
+    def __add__(self, other):
 
         assert type(other) in (type(self), self.add_to_type) or other == 0, f'{(type(self))} cannot be added to {type(other)}'
         
@@ -71,33 +76,62 @@ class SingleOperator:
         
         if other == 0:
             return self
+        
+        assert False
 
-    def __radd__(self, other: Union[OperatorType, Numerics]) -> Union[OperatorType, Numerics]:
+    @overload
+    def __radd__(self, other: Numerics) -> "Self": ...
+    @overload
+    def __radd__(self, other: OperatorType) -> Union[OperatorType, Numerics]: ...
+    
+    def __radd__(self, other):
         return self + other
     
+    # Negation
     def __neg__(self) -> "SingleOperator":
         c = - self.coefficient
         return type(self)(operator_tup=self.operator_tup, coefficient=c)
     
+    # Subtraction
+    @overload
+    def __sub__(self, other: Numerics) -> "Self": ...
+    @overload
+    def __sub__(self, other: OperatorType) -> Union[OperatorType, Numerics]: ...
+    
     def __sub__(self, other: Union[OperatorType, Numerics]) -> Union[OperatorType, Numerics]:
         return self + (-other)
     
-    def __rsub__(self, other: Union[OperatorType, Numerics]) -> Union[OperatorType, Numerics]:
+    @overload
+    def __rsub__(self, other: Numerics) -> "Self": ...
+    @overload
+    def __rsub__(self, other: OperatorType) -> Union[OperatorType, Numerics]: ...
+    
+    def __rsub__(self, other):
         return other + (-self)
 
-    def __mul__(self, other: Numerics) -> "SingleOperator":
+    # Multiplication
+    def __mul__(self, other: Numerics) -> Union[Self, Numerics]:
         assert isinstance(other, complex) or isinstance(other, float) or isinstance(other, int), 'Not multiplied by a numeric value'
         c = self.coefficient * other
         return type(self)(operator_tup=self.operator_tup, coefficient=c, is_identity = self.is_identity)
     
-    def __rmul__(self, other: Numerics) -> "SingleOperator":
+    def __rmul__(self, other: Numerics) -> Union[Self, Numerics]:
         return self * other
     
-    def __truediv__(self, other: Numerics) -> "SingleOperator":
+    # Devision
+    def __truediv__(self, other: Numerics) -> Union[Self, Numerics]:
         assert isinstance(other, complex) or isinstance(other, float) or isinstance(other, int), 'Not divided by numeric value'
         return 1/other * self
     
-    def __matmul__(self, other: Union[OperatorType, KetType]) -> Union[OperatorType, KetType]:
+    # Matrix Multiplication
+    @overload
+    def __matmul__(self, other: OperatorType) -> OperatorType: ...
+    @overload
+    def __matmul__(self, other: "SingleKet") -> "SingleKet": ...
+    @overload
+    def __matmul__(self, other: "Ket") -> "Ket": ...
+
+    def __matmul__(self, other):
         assert type(other) in (*self.act_by_type, *self.act_on_type), f'{type(other)} cannot act on {type(self)}'
         
         if isinstance(other, SingleOperator):
@@ -125,7 +159,7 @@ class SingleOperator:
 
         if isinstance(other, Operator):
             if self.is_identity:
-                return self.coefficient * other        
+                return self.coefficient * other
             else:
                 return other.__rmatmul__(self)
         
@@ -136,8 +170,9 @@ class SingleOperator:
             return other.__rmatmul__(self)
         
     def __rmatmul__(self, other: OperatorType) -> OperatorType:
-        return other @ self
-        
+        return cast(OperatorType, other @ self)
+    
+    # Representation
     def __repr__(self) -> str:
         return str(self.rep)[1:-1]
     
@@ -184,20 +219,23 @@ class Operator:
         self.act_on_type = (SingleOperator, Operator, Ket, SingleKet) if act_on_type is None else act_on_type
         self.act_by_type = (SingleOperator, Operator) if act_by_type is None else act_by_type
         
-        self.rep: set[Type[SingleOperator]]
-
-    def get_dict(self):
-        dict_form = { list(c.rep.keys())[0]: list(c.rep.values())[0] for c in self.rep}
-        return dict_form
+        self.rep: set[SingleOperator]
     
-
     def __hash__(self) -> int:
         return hash(tuple(self.rep))
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.rep)
 
-    def __add__(self, other: Union[Type["Operator"], Type["SingleOperator"], int]):
+    # Basic Arithmetic
+    
+    # Addition
+    @overload
+    def __add__(self, other: Numerics) -> Self: ...
+    @overload
+    def __add__(self, other: OperatorType) -> Union[OperatorType, Numerics]: ...
+
+    def __add__(self, other):
         
         assert type(other) in (type(self), self.single_type) or other == 0, f'{type(self)} cannot be added to {type(other)}'
         
@@ -216,58 +254,72 @@ class Operator:
         
         return new_op
 
+    @overload
+    def __radd__(self, other: Numerics) -> Self: ...
+    @overload
+    def __radd__(self, other: OperatorType) -> Union[OperatorType, Numerics]: ...
 
-    def __radd__(self, other: Union[Type["Operator"], Type["SingleOperator"]]):
+    def __radd__(self, other):
         return self + other
 
-    def __neg__(self):
+    # Negation
+    def __neg__(self) -> Self:
         new_rep = map(lambda x: -x, self.rep)
         return type(self)(*new_rep)
 
-    def __sub__(self, other):
+    # Subtraction
+    def __sub__(self, other: Union[OperatorType, Numerics]) -> Union[OperatorType, Numerics]:
         return self + (-other)
     
-    def __rsub__(self, other):
+    def __rsub__(self, other: Union[OperatorType, Numerics]) -> Union[OperatorType, Numerics]:
         return  - self + other
     
-    def __mul__(self, other):
+    # Multiplication
+    def __mul__(self, other: Numerics) -> Union[Self, Numerics]:
         assert isinstance(other, complex) or isinstance(other, float) or isinstance(other, int), 'Not numeric value'
-        new_rep = map(lambda x: other * x, self.rep)
+        new_rep = cast(Iterator[SingleOperator], map(lambda x: other * x, self.rep))
         return type(self)(*new_rep)
 
-    def __rmul__(self, other):
+    def __rmul__(self, other: Numerics) -> Union[Self, Numerics]:
         assert isinstance(other, complex) or isinstance(other, float) or isinstance(other, int), 'Not numeric value'
         return self * other
     
-    def __truediv__(self, other):
+    # Division
+    def __truediv__(self, other: Numerics) -> Union[Self, Numerics]:
         assert isinstance(other, complex) or isinstance(other, float) or isinstance(other, int), 'Not numeric value'
         return 1/other * self
     
+    # matrix multiplication
+    @overload
+    def __matmul__(self, other: OperatorType) -> OperatorType: ...
+
+    @overload
+    def __matmul__(self, other: KetType) -> "Ket": ...
+
     def __matmul__(self, other):
         assert isinstance(other, self.act_on_type), f'{type(self)} cannot act on {type(other)}'
         
         if isinstance(other, SingleOperator):
-            new_rep = map(lambda x: x @ other, self.rep)
+            new_rep = cast(Iterator[SingleOperator], map(lambda x: x @ other, self.rep))
             return type(self)(*new_rep)
 
         elif isinstance(other, Operator):
-            new_rep = [op1 @ op2 for op1, op2 in product(self.rep, other.rep)]
+            new_rep = cast(Iterator[SingleOperator], [op1 @ op2 for op1, op2 in product(self.rep, other.rep)])
             return type(self)(*new_rep)
         
         elif isinstance(other, (SingleKet, Ket)):
             return other.__rmatmul__(self)
     
-    def __rmatmul__(self, other):
+    def __rmatmul__(self, other: OperatorType) -> OperatorType:
         assert isinstance(other, SingleOperator) or isinstance(other, Operator), f'{type(self)} cannot act on {type(other)}'
         
         if isinstance(other, SingleOperator):
-            new_rep = map(lambda x: other @ x, self.rep)
+            new_rep = cast(Iterator[SingleOperator], map(lambda x: other @ x, self.rep))
             return type(self)(*new_rep)
         
         else:
             return other @ self
     
-
     def __repr__(self) -> str:
         if self.rep != 0:
             str_rep = ''
@@ -288,35 +340,41 @@ class SingleKet:
     __slots__ = ('label_tup', 'coefficient', 'operator', 'rep', 'add_to_type', 'act_on_type', 'act_by_type')
 
     def __new__(cls: type["SingleKet"], 
-                label_tup: tuple[Union[int, str]], 
+                label_tup: LabelTuple, 
                 coefficient: Optional[Numerics] = 1, 
-                operator: Optional[Operator] = None,
-                add_to_type: Optional[type] = None,
-                act_by_type: Optional[tuple[type]] = None) -> "SingleKet":
+                operator: Optional[SingleOperator] = None,
+                add_to_type: Optional[type["Ket"]] = None,
+                act_by_type: Optional[tuple[OperatorType, ...]] = None) -> "SingleKet":
         
         if coefficient == 0:
             return cast(Self, 0.)
         else:
             return super(SingleKet, cls).__new__(cls)
     
-    def __init__(self, label_tup: tuple , coefficient: complex = 1, operator = None,
-                 add_to_type: Optional[type] = None,
-                 act_by_type: Optional[tuple[type]] = None,) -> None:
+    def __init__(self, 
+                label_tup: LabelTuple, 
+                coefficient: Numerics = 1, 
+                operator: Optional[SingleOperator] = None,
+                add_to_type: Optional[type["Ket"]] = None,
+                act_by_type: Optional[tuple[OperatorType, ...]] = None,) -> None:
         
         if operator is None:
-            operator = SingleOperator(('I',), is_identity=True)
+            operator = SingleOperator((('I',),), is_identity=True)
 
         assert isinstance(operator, SingleOperator) or operator is None, 'Operator must be an instance of SingleOperator or None'
         
+        self.label_tup: LabelTuple 
+        self.coefficient: Numerics 
+        self.operator: SingleOperator
+        
         self.label_tup, self.coefficient, self.operator = self.redistribute_coefficient(label_tup=label_tup, coeff=coefficient, operator=operator)
 
-        self.rep = {(self.operator, self.label_tup): self.coefficient}
+        self.rep: dict[tuple[SingleOperator, LabelTuple], Numerics] = {(self.operator, self.label_tup): self.coefficient}
 
-        self.add_to_type = Ket if add_to_type is None else add_to_type
-        self.act_by_type = (Operator, SingleOperator) if act_by_type is None else act_by_type
+        self.add_to_type: type[Ket] = cast(type, Ket) if add_to_type is None else add_to_type
+        self.act_by_type: tuple[OperatorType, ...] = cast(tuple[OperatorType, ...], (Operator, SingleOperator)) if act_by_type is None else act_by_type
 
-
-    def redistribute_coefficient(self, label_tup, coeff, operator):
+    def redistribute_coefficient(self, label_tup: LabelTuple, coeff: Numerics, operator: SingleOperator) -> tuple[LabelTuple, Numerics, SingleOperator]:
         
         if isinstance(operator, SingleOperator):
             c_op = operator.coefficient
@@ -331,16 +389,23 @@ class SingleKet:
             return label_tup, coeff, operator
 
 
-
     def __hash__(self) -> int:
         return hash(tuple(self.rep.items()))
 
-    def __eq__(self, other) -> bool:
+    def __eq__(self, other: "SingleKet") -> bool: # type: ignore
         assert isinstance(other, SingleKet), f'{type(self)} can only be compared to {type(self)}.'
         return hash(self) == hash(other)
     
 
     # Basic Arithmetics
+
+    # Addition
+    @overload
+    def __add__(self, other: Numerics) -> "Self": ...
+    
+    @overload
+    def __add__(self, other: KetType) -> Union[KetType, Numerics]: ...
+    
     def __add__(self, other):
         
         assert type(other) in (type(self), self.add_to_type) or other == 0, f'{type(self)} cannot be added to {other}'
@@ -358,33 +423,60 @@ class SingleKet:
         if other == 0:
             return self
 
+    @overload
+    def __radd__(self, other: Numerics) -> "Self": ...
+    
+    @overload
+    def __radd__(self, other: KetType) -> Union[KetType, Numerics]: ...
 
     def __radd__(self, other):
         return self + other
-    
-    def __neg__(self):
+
+    # Negation    
+    def __neg__(self) -> "Self":
         c = - self.coefficient
         return type(self)(label_tup=self.label_tup, coefficient=c, operator = self.operator)
+    
+    # Subtraction
+    @overload
+    def __sub__(self, other: Numerics) -> "Self": ...
+    
+    @overload
+    def __sub__(self, other: KetType) -> Union[KetType, Numerics]: ...
     
     def __sub__(self, other):
         return self + (-other)
     
+    @overload
+    def __rsub__(self, other: Numerics) -> "Self": ...
+    
+    @overload
+    def __rsub__(self, other: KetType) -> Union[KetType, Numerics]: ...
+    
     def __rsub__(self, other):
         return other + (-self)
 
-    def __mul__(self, other):
+    # Multiplication
+    def __mul__(self, other: Numerics) -> Union[Self, Numerics]:
         assert isinstance(other, complex) or isinstance(other, float) or isinstance(other, int), 'Not multiplied by a numeric value'
-        c = self.coefficient * other
+        c: Numerics = self.coefficient * other
         return type(self)(label_tup=self.label_tup, coefficient=c, operator = self.operator)
     
-    def __rmul__(self, other):
+    def __rmul__(self, other: Numerics) -> Union[Self, Numerics]:
         return self * other
     
-    def __truediv__(self, other):
+    # Division
+    def __truediv__(self, other: Numerics) -> Union[Self, Numerics]:
         assert isinstance(other, complex) or isinstance(other, float) or isinstance(other, int), 'Not divided by numeric value'
         return 1/other * self
-
     
+    # Matrix Multiplication
+    @overload
+    def __rmatmul__(self, other: SingleOperator) -> "Self": ...
+
+    @overload
+    def __rmatmul__(self, other: Operator) -> "Ket": ...
+
     def __rmatmul__(self, other):
         #type_assertion = reduce(lambda b1, b2: b1 or b2, [isinstance(other, t) for t in self.act_by_type])
         assert isinstance(other, self.act_by_type), f'{type(other)} cannot act on {type(self)}'
@@ -409,14 +501,15 @@ class SingleKet:
 
 class Ket:
 
+    __slot__ = ('rep', 'single_type', 'act_by_type')
+
     def __new__(cls: type["Ket"], *single_kets: SingleKet, 
-                 single_type: Optional[type] = None,
-                 act_on_type: Optional[tuple[type]] = None,
-                 act_by_type: Optional[tuple[type]] = None,) -> "Ket":
+                single_type: Optional[type] = None,
+                act_by_type: Optional[tuple[type]] = None,) -> "Ket":
         
-        dict_adder = lambda d1, d2: {k: v for k in set(d1)|set(d2) if (v := d1.get(k, 0) + d2.get(k, 0)) != 0}
-        single_kets = map(lambda op: op.rep, single_kets)
-        ket = reduce(dict_adder, single_kets)
+        dict_adder: Callable[[dict, dict], dict] = lambda d1, d2: {k: v for k in set(d1)|set(d2) if (v := d1.get(k, 0) + d2.get(k, 0)) != 0}
+        single_kets_ = map(lambda op: op.rep, single_kets) 
+        ket = reduce(dict_adder, single_kets_)
         single_type = SingleKet if single_type is None else single_type
         new_ket_list: list[Type[SingleKet]] = [single_type(label_tup=ket_tup, coefficient=ket_c, operator=ket_op) for (ket_op, ket_tup), ket_c in ket.items()]
         
@@ -433,27 +526,31 @@ class Ket:
             object.__setattr__(new_ket, 'rep', set(new_ket_list))
             return new_ket
     
-    def __init__(self, *SingleKets, 
-                 single_type = None,
-                 act_by_type = None,
+    def __init__(self, *SingleKets: SingleKet, 
+                 single_type: Optional[type] = None,
+                 act_by_type: Optional[tuple[type]] = None,
                  ) -> None:
         
 
         self.single_type = SingleKet if single_type is None else single_type
         self.act_by_type = (SingleOperator, Operator) if act_by_type is None else act_by_type
 
-        self.rep: set[SingleKets]
-
-    def get_dict(self):
-        dict_form = { list(c.rep.keys())[0]: list(c.rep.values())[0] for c in self.rep}
-        return dict_form
-    
+        self.rep: set[SingleKet]
 
     def __hash__(self) -> int:
         return hash(tuple(self.rep))
 
     def __len__(self):
         return len(self.rep)
+
+    # Arithmetics
+
+    # Addition
+    @overload
+    def __add__(self, other: Numerics) -> "Self": ...
+    
+    @overload
+    def __add__(self, other: KetType) -> Union[KetType, Numerics]: ...
 
     def __add__(self, other):
         
@@ -474,33 +571,61 @@ class Ket:
         
         return new_ket
 
+    @overload
+    def __radd__(self, other: Numerics) -> "Self": ...
+    
+    @overload
+    def __radd__(self, other: KetType) -> Union[KetType, Numerics]: ...
 
     def __radd__(self, other):
         return self + other
 
-    def __neg__(self):
+    # Negation
+    def __neg__(self) -> "Self":
         new_rep = map(lambda x: -x, self.rep)
         return type(self)(*new_rep)
+
+    # Subtraction
+    @overload
+    def __sub__(self, other: Numerics) -> "Self": ...
+    
+    @overload
+    def __sub__(self, other: KetType) -> Union[KetType, Numerics]: ...
 
     def __sub__(self, other):
         return self + (-other)
     
+    @overload
+    def __rsub__(self, other: Numerics) -> "Self": ...
+    
+    @overload
+    def __rsub__(self, other: KetType) -> Union[KetType, Numerics]: ...
+
     def __rsub__(self, other):
         return  - self + other
     
-    def __mul__(self, other):
+
+    # Multiplication
+    def __mul__(self, other: Numerics) -> Union[Self, Numerics]:
         assert isinstance(other, complex) or isinstance(other, float) or isinstance(other, int), 'Not numeric value'
-        new_rep = map(lambda x: other * x, self.rep)
+        new_rep = cast(Iterator[SingleKet], map(lambda x: other * x, self.rep))
         return type(self)(*new_rep)
 
-    def __rmul__(self, other):
+    def __rmul__(self, other: Numerics) -> Union[Self, Numerics]:
         assert isinstance(other, complex) or isinstance(other, float) or isinstance(other, int), 'Not numeric value'
         return self * other
     
-    def __truediv__(self, other):
+    # Division
+    def __truediv__(self, other: Numerics) -> Union[Self, Numerics]:
         assert isinstance(other, complex) or isinstance(other, float) or isinstance(other, int), 'Not numeric value'
         return 1/other * self
     
+    # Matrix Multuplication
+    @overload
+    def __rmatmul__(self, other: SingleOperator) -> Self: ...
+
+    @overload
+    def __rmatmul__(self, other: Operator) -> "Ket": ...
 
     def __rmatmul__(self, other):
         assert isinstance(other, SingleOperator) or isinstance(other, Operator), f'{type(self)} cannot act on {type(other)}'
@@ -513,7 +638,6 @@ class Ket:
             new_rep = (sop @ sket for sop, sket in product(other.rep, self.rep))
             return type(self)(*new_rep)
     
-
     def __repr__(self) -> str:
         str_rep = ''
         for s in self.rep:
