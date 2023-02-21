@@ -1,8 +1,20 @@
 from .PauliString import PauliString, SinglePauliString, toPauliBasis, SingleQuantumState
 from typing import Dict
-from numpy import array
+from numpy import array, kron, pi, exp, sqrt, sin, cos, eye, zeros
 from functools import reduce
 from itertools import product
+
+
+
+X = array([[0, 1], [1, 0]])
+Y = array([[0, -1j], [1j, 0]])
+Z = array([[1, 0], [0, -1]])
+H = (X + Z)/sqrt(2)
+T = array([[1, 0], [0, exp(1j * pi/4)]])
+S = array([[1, 0], [0, 1j]])
+S_dag = array([[1, 0], [0, -1j]])
+
+
 
 def generateQuantumGate(n: int, 
                         free_bits_dict: Dict[int, str] = {}, 
