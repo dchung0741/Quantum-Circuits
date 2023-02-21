@@ -45,11 +45,11 @@ class SingleOperator:
         self.act_by_type = (SingleOperator, Operator) if act_by_type is None else act_by_type
 
     def __hash__(self) -> int:
-        return hash(tuple(self.rep))
+        return hash((self.coefficient, self.operator_tup))
 
     def __eq__(self, other: "SingleOperator") -> bool: # type: ignore
         assert isinstance(other, SingleOperator), 'SingleFermionicOperator can only be compared to SingleFermionicOperator'
-        return hash(self) == hash(other)
+        return (self.coefficient == other.coefficient) and (self.operator_tup == other.operator_tup)
     
     # Basic Arithmetics
     
@@ -390,12 +390,11 @@ class SingleKet:
 
 
     def __hash__(self) -> int:
-        return hash(tuple(self.rep.items()))
+        return hash((self.operator, self.label_tup, self.coefficient))
 
     def __eq__(self, other: "SingleKet") -> bool: # type: ignore
         assert isinstance(other, SingleKet), f'{type(self)} can only be compared to {type(self)}.'
-        return hash(self) == hash(other)
-    
+        return (self.operator == other.operator) and (self.coefficient == other.coefficient) and (self.label_tup == other.label_tup)
 
     # Basic Arithmetics
 
